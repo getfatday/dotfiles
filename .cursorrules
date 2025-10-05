@@ -1,0 +1,105 @@
+# Cursor Rules for Dotfiles Repository
+
+This repository uses the `ansible-role-dotmodules` system for automated dotfile management and system configuration.
+
+## Repository Structure
+
+- **modules/**: Contains dotfile modules, each with:
+  - `config.yml`: Module configuration (Homebrew packages, stow dirs, etc.)
+  - `files/`: Dotfiles to be deployed via GNU Stow
+- **playbooks/**: Ansible playbooks for deployment
+- **README.md**: Documentation and usage instructions
+
+## Key Concepts
+
+### Module Configuration (`config.yml`)
+Each module defines its dependencies and deployment settings:
+- `homebrew_packages`: List of Homebrew packages to install
+- `homebrew_taps`: List of Homebrew taps to add
+- `homebrew_casks`: List of Homebrew casks to install
+- `stow_dirs`: List of directories to deploy via GNU Stow
+- `mas_installed_apps`: List of Mac App Store apps to install
+
+### File Structure
+- Use `files/` directory for all dotfiles
+- Follow standard dotfile conventions (`.config/`, `.local/`, etc.)
+- Use GNU Stow directory structure for clean deployment
+
+## Development Guidelines
+
+### Adding New Modules
+1. Create module directory in `modules/`
+2. Add `config.yml` with module configuration
+3. Create `files/` directory with dotfiles
+4. Test with Ansible playbook
+5. Update documentation
+
+### Modifying Existing Modules
+1. Edit `config.yml` for dependency changes
+2. Modify files in `files/` directory
+3. Test changes with playbook
+4. Commit changes with descriptive messages
+
+### Testing
+- Always test modules individually first
+- Use `--check` mode for dry runs
+- Verify Homebrew package lists
+- Test GNU Stow deployment
+
+## Common Tasks
+
+### Creating a New Module
+```bash
+mkdir modules/new-module
+touch modules/new-module/config.yml
+mkdir modules/new-module/files
+# Add configuration and files
+```
+
+### Testing a Module
+```bash
+ansible-playbook -i inventory test.yml --check
+```
+
+### Deploying Changes
+```bash
+ansible-playbook -i inventory playbook.yml
+```
+
+## File Patterns
+
+- **Shell configs**: `.zshrc`, `.bashrc`, `.profile`
+- **Git configs**: `.gitconfig`, `.gitignore`
+- **Editor configs**: `.vimrc`, `.config/nvim/`
+- **Language configs**: `.config/pip/`, `.config/npm/`
+- **Scripts**: `.local/bin/`
+
+## Dependencies
+
+- Ansible 2.9+
+- GNU Stow
+- Homebrew (macOS)
+- ansible-role-dotmodules role
+
+## Best Practices
+
+1. **Keep modules focused**: Each module should have a single purpose
+2. **Document dependencies**: Clearly list all required packages
+3. **Test thoroughly**: Verify all configurations work
+4. **Use version control**: Track all changes
+5. **Handle conflicts**: Be aware of potential configuration conflicts
+
+## Troubleshooting
+
+- Check Ansible role dependencies
+- Verify GNU Stow installation
+- Ensure Homebrew is working
+- Check for existing dotfile conflicts
+- Use verbose mode for debugging
+
+## Related Files
+
+- `ansible-role-dotmodules/`: The core role implementation
+- `tests/`: Test configurations and examples
+- `playbooks/`: Deployment playbooks
+- `modules/`: Individual dotfile modules

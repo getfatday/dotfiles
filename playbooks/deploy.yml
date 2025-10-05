@@ -1,0 +1,18 @@
+---
+# Main deployment playbook for dotfiles
+- name: Deploy dotfiles using ansible-role-dotmodules
+  hosts: localhost
+  vars:
+    dotmodules:
+      repo: "file://{{ playbook_dir }}/../modules"
+      dest: "{{ ansible_env.HOME }}/.dotmodules"
+      install:
+        - shell
+        - git
+        - dev-tools
+        - editor
+        - python
+        - node
+        - go
+  roles:
+    - getfatday.dotmodules

@@ -1,0 +1,12 @@
+---
+# Example module configuration
+# This demonstrates the basic structure of a dotfile module
+
+# Homebrew packages this module needs
+homebrew_packages:
+  - tree
+  - htop
+
+# This module contributes to the stow deployment
+stow_dirs:
+  - example
