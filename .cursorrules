@@ -97,6 +97,46 @@ ansible-playbook -i inventory playbook.yml
 - Check for existing dotfile conflicts
 - Use verbose mode for debugging
 
+## Current Modules
+
+### Installed Modules
+- **git**: Git configuration with aliases and `git open` command
+- **macos**: macOS system configuration and Mac App Store apps
+- **1password**: 1Password password manager
+- **zsh**: Zsh shell with prezto framework
+- **handbrake**: Handbrake video converter
+- **finances**: Copilot Money personal finance app
+- **node**: Node.js development with asdf and pnpm
+- **iterm**: iTerm2 terminal with themes and profiles
+- **alfred**: Alfred productivity app with workflows
+- **obsidian**: Obsidian note-taking app with Web Clipper integration
+- **chatgpt**: ChatGPT AI assistant desktop app
+- **claude**: Claude AI assistant desktop app
+- **cursor**: Cursor AI-powered code editor
+
+### Obsidian Module Details
+The Obsidian module provides a complete knowledge management system:
+- **Applications**: Obsidian.app (Homebrew Cask) + Obsidian Web Clipper (Mac App Store)
+- **Templates**: Daily notes, meeting notes, project notes, web clips
+- **Configuration**: CSS snippets, setup scripts, vault management tools
+- **Location**: `~/.config/obsidian/` (templates, snippets, scripts, plugins)
+- **Scripts**: `~/.config/obsidian/scripts/setup-obsidian.sh`
+- **Commands**: `obsidian`, `obsidian-vault`, `obsidian-templates`
+
+## Deployment Verification
+
+### Testing Process
+1. **Dry Run**: `ansible-playbook -i inventory deploy.yml --check`
+2. **Verify Apps**: Check `/Applications/` for installed apps
+3. **Verify Configs**: Check `~/.config/` for deployed files
+4. **Test Functionality**: Run setup scripts and verify commands work
+
+### Common Issues
+- **GNU Stow Conflicts**: Avoid `.local/bin/` conflicts between modules
+- **Homebrew Permissions**: Sudo password required for Homebrew operations
+- **Mac App Store**: Apps may already be installed (skipped in deployment)
+- **Architecture Detection**: ARM64 vs x86_64 Homebrew paths
+
 ## Related Files
 
 - `ansible-role-dotmodules/`: The core role implementation

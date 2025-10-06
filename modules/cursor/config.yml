@@ -1,0 +1,17 @@
+---
+# Cursor module
+# Cursor AI-powered code editor
+
+# Cursor from Homebrew Cask
+homebrew_casks:
+  - cursor
+
+# Stow directories for Cursor configs
+stow_dirs:
+  - cursor
+
+# Note: This module provides:
+# - Cursor AI-powered code editor
+# - Configuration files for Cursor settings
+# - Integration with development workflows
+# - AI-assisted coding capabilities
