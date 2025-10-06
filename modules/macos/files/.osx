@@ -222,6 +222,11 @@ defaults write com.apple.mail AddressesIncludeNameOnPasteboard -bool false
 # Spotlight                                                                   #
 ###############################################################################
 
+# Disable the default Spotlight hotkey (Command+Space) to avoid conflicts with Alfred
+# This allows Alfred to use Command+Space as its default hotkey
+# Note: This requires a logout/login to take effect
+defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 64 -dict-add enabled -bool false
+
 if [[ "$RUN_AS_ROOT" = true ]]; then
   # Disable Spotlight indexing for any volume that gets mounted and has not yet
   # been indexed before.
