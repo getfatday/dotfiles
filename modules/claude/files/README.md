@@ -19,6 +19,10 @@ This module provides the [Claude desktop application](https://apps.apple.com/us/
 - **Apple Silicon (ARM64)**: Desktop app available via Homebrew Cask
 - **Intel Macs (x86_64)**: Use web version at https://claude.ai/
 
+### Installation Notes
+- Requires native ARM64 Homebrew (`/opt/homebrew/bin/brew`)
+- Install with: `arch -arm64 /opt/homebrew/bin/brew install --cask claude`
+
 ## Usage
 
 ### Basic Commands

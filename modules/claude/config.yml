@@ -2,16 +2,16 @@
 # Claude module
 # Anthropic Claude desktop application
 
-# Note: Claude desktop app is only available for ARM64 (Apple Silicon) Macs
-# For Intel Macs, use the web version at https://claude.ai/
-# or install via direct download from Anthropic
+# Claude from Homebrew Cask (Apple Silicon)
+homebrew_casks:
+  - claude
 
 # Stow directories for Claude configs
 stow_dirs:
   - claude
 
 # Note: This module provides:
-# - Claude configuration files and documentation
+# - Claude desktop application for AI conversations
+# - Configuration files for Claude settings
 # - Integration with other productivity tools
 # - AI-powered assistance workflows
-# - Instructions for accessing Claude on Intel Macs

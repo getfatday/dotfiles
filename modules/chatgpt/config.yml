@@ -2,16 +2,16 @@
 # ChatGPT module
 # OpenAI ChatGPT desktop application
 
-# Note: ChatGPT desktop app is only available for ARM64 (Apple Silicon) Macs
-# For Intel Macs, use the web version at https://chat.openai.com/
-# or install via direct download from OpenAI
+# ChatGPT from Homebrew Cask (Apple Silicon)
+homebrew_casks:
+  - chatgpt
 
 # Stow directories for ChatGPT configs
 stow_dirs:
   - chatgpt
 
 # Note: This module provides:
-# - ChatGPT configuration files and documentation
+# - ChatGPT desktop application for AI conversations
+# - Configuration files for ChatGPT settings
 # - Integration with other productivity tools
 # - AI-powered assistance workflows
-# - Instructions for accessing ChatGPT on Intel Macs
