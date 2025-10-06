@@ -1,0 +1,18 @@
+---
+# Finances module
+# Personal finance and budgeting applications
+
+# Copilot: Track & Budget Money from Mac App Store
+mas_installed_apps:
+  - 1447330651   # Copilot: Track & Budget Money
+
+# Stow directories for finance configs
+stow_dirs:
+  - finances
+
+# Note: This module provides:
+# - Copilot Money app for personal finance tracking
+# - Budget and spending analysis tools
+# - Investment tracking capabilities
+# - Subscription management
+# - Finance configuration files (if any)

@@ -1,0 +1,22 @@
+---
+# Zsh with Prezto module
+# Complete zsh shell environment with Prezto framework
+
+# Core zsh dependencies
+homebrew_packages:
+  - zsh
+  - zsh-history-substring-search
+
+# Prezto framework dependencies
+# Note: Prezto will be installed via git clone in the stow files
+# This ensures prezto is available for the zsh configuration
+
+# Stow directories for zsh configs
+stow_dirs:
+  - zsh
+
+# Note: This module provides:
+# - Zsh shell with Prezto framework
+# - History substring search plugin
+# - Custom zsh configuration from legacy .zshrc
+# - Input configuration from legacy .inputrc

@@ -1,0 +1,25 @@
+---
+# macOS system configuration module
+# Based on legacy .osx analysis
+
+# System configuration tools
+homebrew_packages:
+  - mas  # Mac App Store CLI
+
+# Common Mac App Store applications
+mas_installed_apps:
+  - 1451685025  # WireGuard
+
+# Stow directories for system configs
+stow_dirs:
+  - macos
+
+# Note: This module provides:
+# - Comprehensive macOS defaults configuration
+# - Finder settings (show extensions, status bar, etc.)
+# - Dock configuration
+# - Trackpad and keyboard settings
+# - Screenshot settings
+# - Safari developer tools
+# - Hot corners configuration
+# - Spotlight exclusions

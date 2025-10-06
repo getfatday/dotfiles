@@ -1,8 +1,8 @@
 ---
 # Ansible role requirements for dotfiles repository
 roles:
-  - name: getfatday.dotmodules
-    version: ">=1.0.0"
+  - name: ansible-role-dotmodules
+    src: git+https://github.com/getfatday/ansible-role-dotmodules.git
 
 collections:
   - name: geerlingguy.mac

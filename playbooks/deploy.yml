@@ -7,12 +7,20 @@
       repo: "file://{{ playbook_dir }}/../modules"
       dest: "{{ ansible_env.HOME }}/.dotmodules"
       install:
-        - shell
         - git
-        - dev-tools
-        - editor
-        - python
-        - node
-        - go
+        - macos
+        - 1password
+        - zsh
+        - handbrake
+        - finances
+    # Configure MAS path for x86_64 Macs
+    mas_path: "/usr/local/bin/mas"
   roles:
-    - getfatday.dotmodules
+    - role: ansible-role-dotmodules
+      vars:
+        mas_path: "/usr/local/bin/mas"
+        # Skip Homebrew permission fixes to avoid sudo requirement
+        homebrew_fix_permissions: false
+        # Set empty password to avoid sudo prompts
+        ansible_become_password: ""
+        # Running in x86_64 mode (Rosetta 2)
