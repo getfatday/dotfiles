@@ -1,0 +1,9 @@
+{
+  "alfredsnippet": {
+    "snippet": "git commit -m \"$1\"",
+    "dontautoexpand": true,
+    "keyword": "gc",
+    "name": "Git Commit",
+    "uid": "git-commit"
+  }
+}

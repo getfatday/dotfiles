@@ -1,0 +1,47 @@
+{
+  "alfredworkflow": {
+    "category": "Productivity",
+    "createdby": "Ian Anderson",
+    "description": "Git operations workflow for Alfred",
+    "disabled": false,
+    "name": "Git Operations",
+    "objects": [
+      {
+        "config": {
+          "consecutiveKeyFailureBeep": false,
+          "keyword": "git",
+          "subtext": "Git operations",
+          "text": "Git Operations"
+        },
+        "type": "alfred.workflow.input.keyword",
+        "uid": "git-keyword",
+        "version": 1
+      },
+      {
+        "config": {
+          "consecutiveKeyFailureBeep": false,
+          "keyword": "git status",
+          "subtext": "Show git status",
+          "text": "git status"
+        },
+        "type": "alfred.workflow.input.keyword",
+        "uid": "git-status",
+        "version": 1
+      },
+      {
+        "config": {
+          "consecutiveKeyFailureBeep": false,
+          "keyword": "git push",
+          "subtext": "Push to remote",
+          "text": "git push"
+        },
+        "type": "alfred.workflow.input.keyword",
+        "uid": "git-push",
+        "version": 1
+      }
+    ],
+    "readme": "Git operations workflow for Alfred",
+    "uidata": {},
+    "version": "1.0.0"
+  }
+}

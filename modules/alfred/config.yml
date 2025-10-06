@@ -1,0 +1,18 @@
+---
+# Alfred module
+# Productivity launcher and automation tool for macOS
+
+# Alfred application
+homebrew_casks:
+  - alfred
+
+# Stow directories for Alfred configs
+stow_dirs:
+  - alfred
+
+# Note: This module provides:
+# - Alfred productivity launcher
+# - Custom workflows and snippets
+# - Alfred preferences and settings
+# - Integration with other tools
+# - Productivity automation

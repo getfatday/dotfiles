@@ -15,6 +15,7 @@
         - finances
         - node
         - iterm
+        - alfred
     # Configure MAS path for x86_64 Macs
     mas_path: "/usr/local/bin/mas"
   roles:

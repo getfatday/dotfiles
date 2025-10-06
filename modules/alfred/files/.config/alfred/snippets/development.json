@@ -1,0 +1,9 @@
+{
+  "alfredsnippet": {
+    "snippet": "console.log('$1');",
+    "dontautoexpand": true,
+    "keyword": "cl",
+    "name": "Console Log",
+    "uid": "console-log"
+  }
+}
