@@ -1,6 +1,6 @@
 [user]
-  name = Jeff Geerling
-  email = geerlingguy@mac.com
+  name = Ian Anderson
+  email = ianderson@example.com
 [core]
   editor = vi
   excludesfile = ~/.gitignore
@@ -30,5 +30,7 @@
   d = diff
   dc = diff --cached
   l = log --graph --pretty=format:"%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset" --abbrev-commit
+  open = "!~/.local/bin/git-open"
+  browse = "!~/.local/bin/git-open"
 [pull]
 	rebase = true

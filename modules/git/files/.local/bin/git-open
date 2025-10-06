@@ -1,0 +1,148 @@
+#!/bin/bash
+
+# git open - Open the current repository in the browser
+# Supports GitHub, GitLab, Bitbucket, and other Git hosting services
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Check if we're in a git repository
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    error "Not in a git repository"
+    exit 1
+fi
+
+# Get the remote URL
+REMOTE_URL=$(git config --get remote.origin.url)
+
+if [ -z "$REMOTE_URL" ]; then
+    error "No remote origin found"
+    exit 1
+fi
+
+# Convert SSH URLs to HTTPS URLs
+if [[ "$REMOTE_URL" == git@* ]]; then
+    # Convert git@github.com:user/repo.git to https://github.com/user/repo
+    REMOTE_URL=$(echo "$REMOTE_URL" | sed 's/git@\([^:]*\):\(.*\)\.git/https:\/\/\1\/\2/')
+fi
+
+# Remove .git suffix if present
+REMOTE_URL=$(echo "$REMOTE_URL" | sed 's/\.git$//')
+
+# Get the current branch
+BRANCH=$(git branch --show-current)
+
+# Get the current commit hash
+COMMIT=$(git rev-parse HEAD)
+
+# Function to open URL in browser
+open_url() {
+    local url="$1"
+    info "Opening: $url"
+    
+    if command -v open >/dev/null 2>&1; then
+        # macOS
+        open "$url"
+    elif command -v xdg-open >/dev/null 2>&1; then
+        # Linux
+        xdg-open "$url"
+    elif command -v start >/dev/null 2>&1; then
+        # Windows
+        start "$url"
+    else
+        error "No browser command found (open, xdg-open, or start)"
+        exit 1
+    fi
+}
+
+# Parse command line arguments
+ACTION="repo"
+FILE_PATH=""
+LINE_NUMBER=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -f|--file)
+            FILE_PATH="$2"
+            ACTION="file"
+            shift 2
+            ;;
+        -l|--line)
+            LINE_NUMBER="$2"
+            shift 2
+            ;;
+        -b|--branch)
+            BRANCH="$2"
+            shift 2
+            ;;
+        -c|--commit)
+            COMMIT="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: git open [options]"
+            echo ""
+            echo "Options:"
+            echo "  -f, --file PATH     Open specific file"
+            echo "  -l, --line NUMBER   Open file at specific line"
+            echo "  -b, --branch BRANCH Open specific branch"
+            echo "  -c, --commit HASH   Open specific commit"
+            echo "  -h, --help          Show this help"
+            echo ""
+            echo "Examples:"
+            echo "  git open                    # Open repository"
+            echo "  git open -f src/main.js     # Open specific file"
+            echo "  git open -f src/main.js -l 42  # Open file at line 42"
+            echo "  git open -b feature-branch  # Open specific branch"
+            echo "  git open -c abc1234         # Open specific commit"
+            exit 0
+            ;;
+        *)
+            error "Unknown option: $1"
+            echo "Use -h or --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Build the URL based on the action
+case $ACTION in
+    "repo")
+        URL="$REMOTE_URL"
+        if [ -n "$BRANCH" ] && [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ]; then
+            URL="$URL/tree/$BRANCH"
+        fi
+        ;;
+    "file")
+        URL="$REMOTE_URL/blob/$BRANCH/$FILE_PATH"
+        if [ -n "$LINE_NUMBER" ]; then
+            URL="$URL#L$LINE_NUMBER"
+        fi
+        ;;
+esac
+
+# Open the URL
+open_url "$URL"
+success "Opened $REMOTE_URL in browser"
