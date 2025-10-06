@@ -61,11 +61,12 @@ module-name/
 
 4. **Run the playbook:**
    ```bash
+   cd playbooks
    # Normal run (recommended)
-   ansible-playbook -i inventory playbook.yml
+   ansible-playbook -i inventory deploy.yml
 
    # If any tasks require privilege escalation (sudo)
-   ansible-playbook -i inventory playbook.yml -K
+   ansible-playbook -i inventory deploy.yml -K
    ```
 
 ### Example Playbook
@@ -175,7 +176,8 @@ stow_dirs:
 
 Run with verbose output to see what's happening:
 ```bash
-ansible-playbook -i inventory playbook.yml -v
+cd playbooks
+ansible-playbook -i inventory deploy.yml -v
 ```
 
 ## Contributing
