@@ -1,0 +1,8 @@
+# asdf configuration
+# Global settings for asdf version manager
+
+# Set the default shims directory
+legacy_version_file = yes
+
+# Set the default tool versions file
+use_legacy_version_file = yes

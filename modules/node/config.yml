@@ -1,0 +1,21 @@
+---
+# Node.js development module
+# Node.js version management with asdf and pnpm package manager
+
+# Core Node.js dependencies
+homebrew_packages:
+  - asdf  # Version manager for multiple languages
+  - node  # Node.js (fallback if asdf not used)
+  - pnpm  # Fast, disk space efficient package manager
+
+# Stow directories for Node.js configs
+stow_dirs:
+  - node
+
+# Note: This module provides:
+# - asdf for Node.js version management
+# - pnpm for fast package management
+# - Node.js development environment
+# - Global npm packages via pnpm
+# - .tool-versions file for asdf
+# - pnpm configuration files

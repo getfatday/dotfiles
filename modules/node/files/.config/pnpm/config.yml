@@ -1,0 +1,26 @@
+# pnpm configuration
+# Fast, disk space efficient package manager for Node.js
+
+# Store path for global packages
+store-dir: ~/.local/share/pnpm
+
+# Global bin directory
+global-bin-dir: ~/.local/bin
+
+# Auto install peer dependencies
+auto-install-peers: true
+
+# Strict peer dependencies
+strict-peer-dependencies: false
+
+# Save exact versions
+save-exact: true
+
+# Use pnpm for npm scripts
+package-manager-strict: true
+
+# Enable pnpm audit
+audit-level: moderate
+
+# Enable pnpm update checker
+update-notifier: true
