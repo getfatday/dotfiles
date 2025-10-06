@@ -1,0 +1,17 @@
+---
+# Grammarly module
+# Grammarly Desktop writing assistant
+
+# Grammarly Desktop from Homebrew Cask
+homebrew_casks:
+  - grammarly-desktop
+
+# Stow directories for Grammarly configs
+stow_dirs:
+  - grammarly
+
+# Note: This module provides:
+# - Grammarly Desktop application for writing assistance
+# - Configuration files for Grammarly settings
+# - Integration with other productivity tools
+# - AI-powered writing and grammar checking
