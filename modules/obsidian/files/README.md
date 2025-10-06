@@ -63,7 +63,7 @@ obsidian-templates ~/Documents/Obsidian/MyVault  # Install templates to vault
 
 ### Setup Script
 ```bash
-~/.local/bin/setup-obsidian.sh
+~/.config/obsidian/scripts/setup-obsidian.sh
 ```
 
 ## Web Clipper Integration
