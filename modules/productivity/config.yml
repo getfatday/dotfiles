@@ -1,0 +1,24 @@
+---
+# Productivity module
+# Productivity tools and navigation utilities
+
+# Productivity dependencies
+homebrew_packages:
+  - autojump
+  - z
+  - fzf
+
+# Stow directories for productivity configs
+stow_dirs:
+  - productivity
+
+# Files that should be merged with other modules
+mergeable_files:
+  - ".zshrc"      # Productivity aliases and functions
+
+# Note: This module provides:
+# - Auto jump configuration
+# - Z directory navigation
+# - Fuzzy finding with fzf
+# - Productivity aliases and functions
+# - Navigation utilities

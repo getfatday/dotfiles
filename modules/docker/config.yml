@@ -1,0 +1,24 @@
+---
+# Docker module
+# Docker development environment and tools
+
+# Docker dependencies
+homebrew_packages:
+  - docker
+  - docker-compose
+  - docker-machine
+
+# Stow directories for Docker configs
+stow_dirs:
+  - docker
+
+# Files that should be merged with other modules
+mergeable_files:
+  - ".zshrc"      # Docker aliases and completions
+
+# Note: This module provides:
+# - Docker development environment
+# - Docker machine management
+# - Docker CLI completions
+# - Docker aliases and functions
+# - Container development tools

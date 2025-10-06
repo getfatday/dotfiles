@@ -1,0 +1,24 @@
+---
+# Editor module
+# Text editor configuration and tools
+
+# Editor dependencies
+homebrew_packages:
+  - emacs
+  - vim
+  - neovim
+
+# Stow directories for editor configs
+stow_dirs:
+  - editor
+
+# Files that should be merged with other modules
+mergeable_files:
+  - ".zshrc"      # Editor aliases and functions
+  - ".zshenv"     # Editor environment variables
+
+# Note: This module provides:
+# - Emacs configuration and aliases
+# - Vim/Neovim configuration
+# - Editor environment variables
+# - Editor productivity functions

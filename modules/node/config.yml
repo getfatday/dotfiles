@@ -12,6 +12,11 @@ homebrew_packages:
 stow_dirs:
   - node
 
+# Files that should be merged with other modules
+mergeable_files:
+  - ".zshrc"      # Node.js environment and asdf integration
+  - ".zshenv"     # Node.js PATH configuration
+
 # Note: This module provides:
 # - asdf for Node.js version management
 # - pnpm for fast package management
