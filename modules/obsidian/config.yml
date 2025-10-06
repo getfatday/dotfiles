@@ -1,0 +1,22 @@
+---
+# Obsidian module
+# Note-taking and knowledge management with web clipping capabilities
+
+# Obsidian application
+homebrew_casks:
+  - obsidian
+
+# Mac App Store apps for Obsidian ecosystem
+mas_installed_apps:
+  - 6720708363  # Obsidian Web Clipper
+
+# Stow directories for Obsidian configs
+stow_dirs:
+  - obsidian
+
+# Note: This module provides:
+# - Obsidian note-taking and knowledge management app
+# - Obsidian Web Clipper for saving web content
+# - Custom vault configurations and templates
+# - Integration with other productivity tools
+# - Knowledge management workflows
