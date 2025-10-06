@@ -1,6 +1,6 @@
 ---
 # Editor module
-# Text editor configuration and tools
+# Emacs with Prelude configuration and tools
 
 # Editor dependencies
 homebrew_packages:
@@ -18,7 +18,9 @@ mergeable_files:
   - ".zshenv"     # Editor environment variables
 
 # Note: This module provides:
-# - Emacs configuration and aliases
-# - Vim/Neovim configuration
+# - Emacs with Prelude framework
+# - Complete Emacs configuration from legacy setup
 # - Editor environment variables
-# - Editor productivity functions
+# - Editor productivity functions and scripts
+# - TypeScript, LSP, and web development support
+# - Custom themes and key bindings
