@@ -1,0 +1,7 @@
+#! /bin/bash
+
+
+to=${1-HEAD}
+from=${to}~${2-1}
+
+git difftool ${from} ${to}

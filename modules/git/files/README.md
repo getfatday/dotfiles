@@ -24,6 +24,7 @@ This module provides a comprehensive Git development environment with enhanced p
 ### Configuration Files
 - `.gitconfig` - Git configuration with aliases and settings
 - `.local/bin/git-open` - Advanced git open script
+- `.local/bin/git-*` - Custom Git utilities (see below)
 
 ## Git Open Command
 
@@ -49,6 +50,34 @@ git open -c abc1234                         # Open specific commit
 - **Bitbucket** - bitbucket.org
 - **Azure DevOps** - dev.azure.com
 - **Any Git hosting service** with standard URL patterns
+
+## Custom Git Binaries
+
+This module includes several custom Git utilities in `~/.local/bin/`:
+
+### Git Workflow Utilities
+- **`git-fixup`** - Creates a fixup commit for the last commit
+- **`git-last`** - Shows diff between two commits (default: HEAD~1 to HEAD)
+- **`git-now`** - Shows diff for current working directory vs HEAD
+
+### Git Branch Management
+- **`git-recent`** - Lists recent branches you've worked on
+  ```bash
+  git recent -n 5    # Show last 5 branches
+  git recent         # Show last 10 branches (default)
+  ```
+- **`git-unused`** - Finds and optionally deletes branches that are gone from origin
+  ```bash
+  git unused         # Show branches that would be deleted
+  git unused -D      # Actually delete the unused branches
+  ```
+
+### Git History Management
+- **`git-update-author`** - Updates author/committer email in commit history
+  ```bash
+  git-update-author old@email.com new@email.com
+  git-update-author old@email.com  # Uses current git config user.email
+  ```
 
 ## Git Aliases
 
