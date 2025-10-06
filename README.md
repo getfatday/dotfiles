@@ -61,7 +61,11 @@ module-name/
 
 4. **Run the playbook:**
    ```bash
+   # Normal run (recommended)
    ansible-playbook -i inventory playbook.yml
+
+   # If any tasks require privilege escalation (sudo)
+   ansible-playbook -i inventory playbook.yml -K
    ```
 
 ### Example Playbook

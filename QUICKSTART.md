@@ -23,7 +23,11 @@
 3. **Deploy dotfiles:**
    ```bash
    cd playbooks
+   # Normal run (recommended)
    ansible-playbook -i inventory deploy.yml
+
+   # If any tasks require privilege escalation (sudo)
+   ansible-playbook -i inventory deploy.yml -K
    ```
 
 ## What Gets Installed
