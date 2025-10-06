@@ -10,9 +10,14 @@ homebrew_casks:
 stow_dirs:
   - alfred
 
+# Files that should be merged with other modules
+mergeable_files:
+  - ".osx"  # Merge with macOS module for Spotlight hotkey management
+
 # Note: This module provides:
 # - Alfred productivity launcher
 # - Custom workflows and snippets
 # - Alfred preferences and settings
 # - Integration with other tools
 # - Productivity automation
+# - Spotlight hotkey management (merged with macOS .osx)

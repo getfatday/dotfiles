@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# Alfred module contribution to macOS configuration
+# This file will be merged with the main macOS .osx file
+
+###############################################################################
+# Alfred Integration                                                          #
+###############################################################################
+
+# Disable the default Spotlight hotkey (Command+Space) to avoid conflicts with Alfred
+# This allows Alfred to use Command+Space as its default hotkey
+# Note: This requires a logout/login to take effect
+defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 64 -dict-add enabled -bool false
+
+# Alternative method using plutil (if defaults command fails)
+# plutil -replace AppleSymbolicHotKeys.64.enabled -bool false ~/Library/Preferences/com.apple.symbolichotkeys.plist
+
+echo "Alfred: Spotlight hotkey disabled to prevent conflicts with Alfred's default hotkey"
+echo "Alfred: Please log out and log back in for changes to take effect"
