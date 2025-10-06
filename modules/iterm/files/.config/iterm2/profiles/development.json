@@ -1,0 +1,40 @@
+{
+  "name": "Development",
+  "description": "Development profile with useful settings",
+  "settings": {
+    "background": "#1e1e1e",
+    "foreground": "#d4d4d4",
+    "font": "Monaco 12",
+    "fontSize": 12,
+    "cursor": "block",
+    "cursorColor": "#ffffff",
+    "selection": "#264f78",
+    "transparency": 0.1,
+    "blur": true,
+    "blurRadius": 0.5,
+    "window": {
+      "title": "Development",
+      "transparency": 0.1
+    },
+    "keyboard": {
+      "keyMappings": [
+        {
+          "key": "cmd+d",
+          "action": "split_vertically"
+        },
+        {
+          "key": "cmd+shift+d",
+          "action": "split_horizontally"
+        },
+        {
+          "key": "cmd+w",
+          "action": "close_tab"
+        },
+        {
+          "key": "cmd+t",
+          "action": "new_tab"
+        }
+      ]
+    }
+  }
+}

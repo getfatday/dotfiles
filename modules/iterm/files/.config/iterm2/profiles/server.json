@@ -1,0 +1,31 @@
+{
+  "name": "Server",
+  "description": "Server profile for remote connections",
+  "settings": {
+    "background": "#000000",
+    "foreground": "#00ff00",
+    "font": "Monaco 11",
+    "fontSize": 11,
+    "cursor": "block",
+    "cursorColor": "#00ff00",
+    "selection": "#333333",
+    "transparency": 0.0,
+    "blur": false,
+    "window": {
+      "title": "Server",
+      "transparency": 0.0
+    },
+    "keyboard": {
+      "keyMappings": [
+        {
+          "key": "cmd+k",
+          "action": "clear_buffer"
+        },
+        {
+          "key": "cmd+r",
+          "action": "reset_terminal"
+        }
+      ]
+    }
+  }
+}

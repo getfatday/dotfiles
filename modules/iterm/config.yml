@@ -1,0 +1,18 @@
+---
+# iTerm2 module
+# Advanced terminal emulator for macOS with configuration
+
+# iTerm2 application
+homebrew_casks:
+  - iterm2
+
+# Stow directories for iTerm2 configs
+stow_dirs:
+  - iterm
+
+# Note: This module provides:
+# - iTerm2 terminal emulator
+# - Custom profiles and themes
+# - Keyboard shortcuts and preferences
+# - Integration with shell configurations
+# - Advanced terminal features

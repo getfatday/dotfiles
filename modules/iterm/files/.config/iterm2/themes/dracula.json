@@ -1,0 +1,26 @@
+{
+  "name": "Dracula",
+  "background": "#282a36",
+  "foreground": "#f8f8f2",
+  "selection": "#44475a",
+  "cursor": "#f8f8f2",
+  "colors": [
+    "#000000",
+    "#ff5555",
+    "#50fa7b",
+    "#f1fa8c",
+    "#bd93f9",
+    "#ff79c6",
+    "#8be9fd",
+    "#bbbbbb",
+    "#555555",
+    "#ff5555",
+    "#50fa7b",
+    "#f1fa8c",
+    "#bd93f9",
+    "#ff79c6",
+    "#8be9fd",
+    "#ffffff"
+  ],
+  "description": "Dracula theme for iTerm2 - Dark theme with vibrant colors"
+}
