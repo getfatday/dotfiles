@@ -1,0 +1,42 @@
+#
+# Sets Prezto options.
+#
+
+# General
+zstyle ':prezto:*:*' color 'yes'
+
+# Modules
+zstyle ':prezto:load' pmodule \
+  'environment' \
+  'terminal' \
+  'editor' \
+  'history' \
+  'directory' \
+  'spectrum' \
+  'utility' \
+  'completion' \
+  'prompt' \
+  'git' \
+  'syntax-highlighting' \
+  'history-substring-search'
+
+# Editor
+zstyle ':prezto:module:editor' key-bindings 'emacs'
+
+# Git
+zstyle ':prezto:module:git:status:ignore' submodules 'all'
+
+# Prompt
+zstyle ':prezto:module:prompt' theme 'sorin'
+
+# Syntax Highlighting
+zstyle ':prezto:module:syntax-highlighting' highlighters \
+  'main' \
+  'brackets' \
+  'pattern' \
+  'line' \
+  'cursor' \
+  'root'
+
+# History Substring Search
+zstyle ':prezto:module:history-substring-search' color 'yes'
