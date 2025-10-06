@@ -6,7 +6,9 @@ export AUTOJUMP_AUTOCOMPLETE_CMDS='e en cat less vi open'
 
 # Z directory navigation
 if command -v brew >/dev/null 2>&1 && (( $+commands[brew] )) ; then
-    . `brew --prefix`/etc/profile.d/z.sh
+    if [[ -f `brew --prefix`/etc/profile.d/z.sh ]]; then
+        . `brew --prefix`/etc/profile.d/z.sh
+    fi
 fi
 
 # Autojump integration
