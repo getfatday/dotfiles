@@ -14,6 +14,10 @@ mas_installed_apps:
 stow_dirs:
   - macos
 
+# Files that should be merged with other modules
+mergeable_files:
+  - ".osx"
+
 # Note: This module provides:
 # - Comprehensive macOS defaults configuration
 # - Finder settings (show extensions, status bar, etc.)

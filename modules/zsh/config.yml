@@ -15,6 +15,11 @@ homebrew_packages:
 stow_dirs:
   - zsh
 
+# Files that should be merged with other modules
+mergeable_files:
+  - ".zshrc"
+  - ".zpreztorc"
+
 # Note: This module provides:
 # - Zsh shell with Prezto framework
 # - Prezto setup script (run ~/.local/bin/setup-prezto.sh)
