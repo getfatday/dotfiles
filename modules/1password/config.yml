@@ -6,10 +6,6 @@
 homebrew_casks:
   - 1password
 
-# Stow directories for 1Password configs
-stow_dirs:
-  - 1password
-
 # Note: This module provides:
 # - 1Password password manager from Mac App Store
 # - 1Password configuration files (if any)

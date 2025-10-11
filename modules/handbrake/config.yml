@@ -6,10 +6,6 @@
 homebrew_casks:
   - handbrake
 
-# Stow directories for Handbrake configs
-stow_dirs:
-  - handbrake
-
 # Note: This module provides:
 # - Handbrake video transcoder from Homebrew Cask
 # - Handbrake configuration files (if any)
