@@ -31,6 +31,9 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
+Reference: `.specify/memory/constitution.md` (v1.0.0)  
+Patterns: `.specify/memory/implementation-patterns.md`
+
 - [ ] **Modularity**: Module is independent, single-purpose, no cross-module dependencies
 - [ ] **Idempotency**: Deployment safely repeatable, no destructive operations without confirmation
 - [ ] **Automation-First**: All steps automated via Ansible, dependencies explicit in config.yml

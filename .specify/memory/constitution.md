@@ -197,4 +197,6 @@ All modules must adhere to:
 
 **Review**: Constitution reviewed quarterly or when significant architectural changes proposed.
 
+**Implementation Guidance**: See `.specify/memory/implementation-patterns.md` for concrete patterns, anti-patterns, and solutions to common challenges.
+
 **Version**: 1.0.0 | **Ratified**: 2025-10-11 | **Last Amended**: 2025-10-11
