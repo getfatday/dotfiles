@@ -1,50 +1,200 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report - Constitution v1.0.0
+========================================
+Version Change: [TEMPLATE] → 1.0.0
+Change Type: MAJOR (Initial ratification)
+Date: 2025-10-11
+
+Principles Defined:
+- I. Modularity
+- II. Idempotency
+- III. Automation-First
+- IV. Cross-Platform Awareness
+- V. Configuration Merging
+- VI. Documentation-First
+- VII. Version Control Everything
+- VIII. Declarative Over Imperative
+
+Sections Added:
+- Core Principles (8 principles)
+- Module Requirements
+- Deployment Standards
+- Governance
+
+Templates Requiring Updates:
+✅ plan-template.md - Updated Constitution Check section
+✅ spec-template.md - Verified compatibility
+✅ tasks-template.md - Verified task categorization aligns
+
+Follow-up: None - all placeholders resolved
+-->
+
+# Dotfiles Management System Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Modularity
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Each tool or application must have its own independent module. Modules are self-contained units that can be deployed separately without dependencies on other modules' internal structure.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+**Rules**:
+- One module per tool/application (e.g., `chrome`, `git`, `node`)
+- Module independence: no cross-module file references
+- Module structure: `config.yml` + optional `files/` directory
+- Clear single responsibility per module
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Rationale**: Modularity enables selective deployment, easier maintenance, and the ability to mix and match configurations across different machines.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Idempotency
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+All deployments must be safely repeatable without side effects. Running the same deployment multiple times must produce identical results.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+**Rules**:
+- No destructive operations without explicit user confirmation
+- Deployment state is deterministic
+- Check before modify (e.g., "install if not present")
+- Use declarative tools (Ansible, Stow) that handle idempotency
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Rationale**: Idempotency prevents configuration drift and makes deployments safe to run repeatedly for updates or verification.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. Automation-First
+
+All configurations must be deployable through automation. Manual installation or configuration steps are not acceptable.
+
+**Rules**:
+- Every module declares dependencies explicitly in `config.yml`
+- No manual post-installation steps (except one-time setup scripts)
+- Use Ansible automation for all deployments
+- Package manager integration (Homebrew, MAS) required for applications
+
+**Rationale**: Automation ensures consistent deployments across systems, reduces human error, and makes onboarding new machines trivial.
+
+### IV. Cross-Platform Awareness
+
+Modules must handle both Apple Silicon (ARM64) and Intel (x86_64) Macs gracefully.
+
+**Rules**:
+- Architecture-specific configurations clearly documented
+- Homebrew path detection (`/opt/homebrew` vs `/usr/local`)
+- Graceful degradation when platform-specific tools unavailable
+- Architecture differences explicitly noted in README files
+
+**Rationale**: Supports diverse hardware while maintaining single configuration source.
+
+### V. Configuration Merging
+
+Multiple modules can contribute to shared configuration files (e.g., `.zshrc`, `.zpreztorc`, `.osx`). 
+
+**Rules**:
+- Mergeable files must be explicitly declared in `config.yml`
+- Each module's contribution must be self-contained
+- No conflicting settings between modules
+- Merged files deployed via merge process, not stow
+
+**Rationale**: Enables modular contributions to shared configs while preventing conflicts and maintaining independence.
+
+### VI. Documentation-First
+
+Every module must include comprehensive documentation explaining its purpose, contents, and usage.
+
+**Rules**:
+- Every module must have `files/README.md`
+- README must document: what gets installed, how to use it, integration points
+- Installation requirements and post-deployment steps documented
+- Examples and common use cases included
+
+**Rationale**: Documentation ensures modules are understandable and maintainable by others (and future you).
+
+### VII. Version Control Everything
+
+All configuration files, scripts, and module definitions must be in version control. Nothing important lives only on local machines.
+
+**Rules**:
+- All dotfiles committed to git
+- Generated files (e.g., `modules/merged/`) must be gitignored
+- Sensitive data never committed (use env vars or external secret management)
+- Machine-specific state excluded from version control
+
+**Rationale**: Version control provides history, backup, and synchronization across machines.
+
+### VIII. Declarative Over Imperative
+
+System state should be defined declaratively, not through imperative scripts.
+
+**Rules**:
+- Configuration in `config.yml` (declarative), not shell scripts
+- Prefer native package managers (Homebrew) over manual downloads
+- Ansible playbooks over bash scripts
+- Shell scripts only for orchestration or one-time setup tasks
+
+**Rationale**: Declarative configurations are easier to understand, audit, and maintain than imperative scripts.
+
+## Module Requirements
+
+All modules must adhere to:
+
+**Structure**:
+- `config.yml` - Module configuration (packages, casks, stow dirs, mergeable files)
+- `files/` - Dotfiles to deploy (optional, omit if module only installs apps)
+- `files/README.md` - Module documentation (required)
+
+**Configuration Elements** (`config.yml`):
+- `homebrew_packages` - List of Homebrew formulae
+- `homebrew_casks` - List of Homebrew casks
+- `mas_installed_apps` - List of Mac App Store app IDs
+- `stow_dirs` - List of directories to deploy via GNU Stow (only if `files/` exists)
+- `mergeable_files` - List of files merged from multiple modules
+
+**Documentation Requirements** (`files/README.md`):
+- Module title and purpose
+- Features list
+- What gets installed
+- Usage examples
+- Integration with other tools
+- Configuration details
+- Troubleshooting section
+
+## Deployment Standards
+
+**Deployment Process**:
+- Use `ansible-playbook` with `ansible-role-dotmodules`
+- All modules declared in playbook `install` list
+- GNU Stow for file deployment
+- Merge process for shared configuration files
+
+**Testing Requirements**:
+- Test module independently before adding to deployment
+- Use `--check` mode for dry runs
+- Verify installations after deployment
+- Document known issues and workarounds
+
+**Quality Gates**:
+- All modules must deploy without errors
+- No manual interventions during deployment
+- Homebrew packages resolve successfully
+- Stow conflicts handled via merge or --adopt flag
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+**Authority**: This constitution supersedes all other development practices and preferences. When in conflict, the constitution wins.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Amendment Process**:
+- Amendments require documented rationale
+- Version number incremented (MAJOR.MINOR.PATCH)
+- Impact analysis on existing modules required
+- Migration plan for breaking changes
+
+**Compliance**:
+- All pull requests must verify constitutional compliance
+- New modules must follow all core principles
+- Deviations require explicit justification and approval
+- Regular audits to ensure continued compliance
+
+**Versioning**:
+- MAJOR: Backward-incompatible principle changes or removals
+- MINOR: New principles added or existing principles expanded
+- PATCH: Clarifications, typo fixes, non-semantic changes
+
+**Review**: Constitution reviewed quarterly or when significant architectural changes proposed.
+
+**Version**: 1.0.0 | **Ratified**: 2025-10-11 | **Last Amended**: 2025-10-11

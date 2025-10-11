@@ -31,7 +31,14 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] **Modularity**: Module is independent, single-purpose, no cross-module dependencies
+- [ ] **Idempotency**: Deployment safely repeatable, no destructive operations without confirmation
+- [ ] **Automation-First**: All steps automated via Ansible, dependencies explicit in config.yml
+- [ ] **Cross-Platform**: Handles ARM64/x86_64, documents architecture differences
+- [ ] **Configuration Merging**: Mergeable files declared if contributing to shared configs
+- [ ] **Documentation-First**: README.md included with comprehensive documentation
+- [ ] **Version Control**: All configs in git, generated files gitignored, no sensitive data
+- [ ] **Declarative**: Uses config.yml + package managers, minimal shell scripts
 
 ## Project Structure
 
