@@ -1,0 +1,18 @@
+---
+# Chrome module
+# Google Chrome web browser
+
+# Google Chrome from Homebrew Cask
+homebrew_casks:
+  - google-chrome
+
+# Stow directories for Chrome configs
+stow_dirs:
+  - chrome
+
+# Note: This module provides:
+# - Google Chrome web browser
+# - Configuration files for Chrome settings
+# - Integration with development workflows
+# - Web browsing and testing capabilities
+

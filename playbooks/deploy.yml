@@ -20,6 +20,7 @@
         - chatgpt
         - claude
         - cursor
+        - chrome
         - grammarly
         - docker
         - editor
@@ -30,8 +31,7 @@
     - role: ansible-role-dotmodules
       vars:
         mas_path: "/usr/local/bin/mas"
-        # Skip Homebrew permission fixes to avoid sudo requirement
-        homebrew_fix_permissions: false
-        # Set empty password to avoid sudo prompts
-        ansible_become_password: ""
-        # Running in x86_64 mode (Rosetta 2)
+        # Additional workarounds for geerlingguy.mac collection
+        homebrew_install_path: "/opt/homebrew"
+        homebrew_user: "{{ ansible_user_id }}"
+        homebrew_group: "admin"
