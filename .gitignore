@@ -46,3 +46,4 @@ Temporary Items
 # Backup files
 *.bak
 *.backup
+modules/merged/
