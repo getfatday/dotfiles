@@ -1,0 +1,28 @@
+---
+# Spec-kit module
+# GitHub Spec Kit for Spec-Driven Development
+
+# Spec-kit dependencies
+homebrew_packages:
+  - uv  # Fast Python package installer and manager
+
+# Note: This module provides:
+# - UV package manager for Python tools
+# - Spec-kit CLI tool (installed via uv tool install)
+# - Cursor slash commands for spec-driven development workflow
+# - Templates for specifications, plans, and tasks
+# - Constitution framework for project principles
+#
+# Installation after deployment:
+#   uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+#
+# Available slash commands in Cursor:
+#   /speckit.constitution - Establish project principles
+#   /speckit.specify - Create feature specifications
+#   /speckit.clarify - Interactive clarification workflow
+#   /speckit.plan - Create implementation plans
+#   /speckit.tasks - Generate actionable tasks
+#   /speckit.implement - Execute implementation
+#   /speckit.analyze - Cross-artifact consistency checks
+#   /speckit.checklist - Quality validation checklists
+
