@@ -1,145 +1,162 @@
 # Cursor Rules for Dotfiles Repository
 
-This repository uses the `ansible-role-dotmodules` system for automated dotfile management and system configuration.
+## Constitution
 
-## Repository Structure
+This repository is governed by the constitution at `.specify/memory/constitution.md` (v1.0.0).
+All development MUST comply with the 8 core principles defined there.
 
-- **modules/**: Contains dotfile modules, each with:
-  - `config.yml`: Module configuration (Homebrew packages, stow dirs, etc.)
-  - `files/`: Dotfiles to be deployed via GNU Stow
-- **playbooks/**: Ansible playbooks for deployment
-- **README.md**: Documentation and usage instructions
+## Critical Patterns from Recent Work
 
-## Key Concepts
+### Configuration Merging in ansible-role-dotmodules
+When modifying the role's configuration reduction logic (tasks/main.yml):
+```yaml
+# ✅ CORRECT: Accumulate list values
+((final_config | default({}))[item.key] | default([]) + item.value) | flatten | unique
 
-### Module Configuration (`config.yml`)
-Each module defines its dependencies and deployment settings:
-- `homebrew_packages`: List of Homebrew packages to install
-- `homebrew_taps`: List of Homebrew taps to add
-- `homebrew_casks`: List of Homebrew casks to install
-- `stow_dirs`: List of directories to deploy via GNU Stow
-- `mas_installed_apps`: List of Mac App Store apps to install
-
-### File Structure
-- Use `files/` directory for all dotfiles
-- Follow standard dotfile conventions (`.config/`, `.local/`, etc.)
-- Use GNU Stow directory structure for clean deployment
-
-## Development Guidelines
-
-### Adding New Modules
-1. Create module directory in `modules/`
-2. Add `config.yml` with module configuration
-3. Create `files/` directory with dotfiles
-4. Test with Ansible playbook
-5. Update documentation
-
-### Modifying Existing Modules
-1. Edit `config.yml` for dependency changes
-2. Modify files in `files/` directory
-3. Test changes with playbook
-4. Commit changes with descriptive messages
-
-### Testing
-- Always test modules individually first
-- Use `--check` mode for dry runs
-- Verify Homebrew package lists
-- Test GNU Stow deployment
-
-## Common Tasks
-
-### Creating a New Module
-```bash
-mkdir modules/new-module
-touch modules/new-module/config.yml
-mkdir modules/new-module/files
-# Add configuration and files
+# ❌ WRONG: Replaces instead of accumulating
+item.value | flatten | unique
 ```
 
-### Testing a Module
-```bash
-ansible-playbook -i inventory test.yml --check
+This ensures all modules' `homebrew_casks`, `homebrew_packages`, etc. are collected, not just the last one.
+
+### Stow Deployment
+Always use `--adopt` flag for stow to handle pre-existing files:
+```yaml
+stow --adopt -d "{{ dotmodules.dest }}/{{ item }}" -t "{{ ansible_env.HOME }}" files
 ```
 
-### Deploying Changes
-```bash
-ansible-playbook -i inventory playbook.yml
+### Homebrew Without Sudo
+Use direct Ansible modules instead of geerlingguy.mac.homebrew:
+```yaml
+- name: Install Homebrew casks
+  community.general.homebrew_cask:
+    name: "{{ homebrew_casks }}"
+    state: present
+    accept_external_apps: yes
 ```
 
-## File Patterns
+## Module Development Rules
 
-- **Shell configs**: `.zshrc`, `.bashrc`, `.profile`
-- **Git configs**: `.gitconfig`, `.gitignore`
-- **Editor configs**: `.vimrc`, `.config/nvim/`
-- **Language configs**: `.config/pip/`, `.config/npm/`
-- **Scripts**: `.local/bin/`
+### config.yml Requirements
+- ✅ DO declare `mergeable_files` if contributing to `.zshrc`, `.zpreztorc`, `.osx`
+- ❌ DON'T declare `stow_dirs` without a `files/` directory
+- ✅ DO use comments to explain what module provides
+- ✅ DO list all dependencies explicitly
 
-## Dependencies
+### files/README.md Requirements (Constitution VI)
+Every module with config files MUST have comprehensive documentation:
+- Module purpose and features
+- What gets installed
+- Usage examples and commands
+- Integration with other tools
+- Configuration details
+- Troubleshooting section
 
-- Ansible 2.9+
-- GNU Stow
-- Homebrew (macOS)
-- ansible-role-dotmodules role
+### Mergeable Files Pattern
+Modules contributing to shared configs (e.g., `.zshrc`):
+```bash
+# In files/.zshrc
+# ModuleName module contribution to Zsh configuration
+# This file will be merged with the main .zshrc file
 
-## Best Practices
+# Module-specific content here
+```
 
-1. **Keep modules focused**: Each module should have a single purpose
-2. **Document dependencies**: Clearly list all required packages
-3. **Test thoroughly**: Verify all configurations work
-4. **Use version control**: Track all changes
-5. **Handle conflicts**: Be aware of potential configuration conflicts
+## Repository Organization
 
-## Troubleshooting
+### Two Repositories
+1. **dotfiles** (this repo): Module definitions and playbooks
+2. **ansible-role-dotmodules**: Core automation engine
 
-- Check Ansible role dependencies
-- Verify GNU Stow installation
-- Ensure Homebrew is working
-- Check for existing dotfile conflicts
-- Use verbose mode for debugging
+When fixing bugs:
+- Fix in ansible-role-dotmodules source repo (`~/src/ansible-role-dotmodules`)
+- Commit and push to GitHub
+- Reinstall in dotfiles: `ansible-galaxy install -r requirements.yml --force`
+- Test deployment to verify fix works
 
-## Current Modules
+## Ansible Role Requirements
 
-### Installed Modules
-- **git**: Git configuration with aliases and `git open` command
-- **macos**: macOS system configuration and Mac App Store apps
-- **1password**: 1Password password manager
-- **zsh**: Zsh shell with prezto framework
-- **handbrake**: Handbrake video converter
-- **finances**: Copilot Money personal finance app
-- **node**: Node.js development with asdf and pnpm
-- **iterm**: iTerm2 terminal with themes and profiles
-- **alfred**: Alfred productivity app with workflows
-- **obsidian**: Obsidian note-taking app with Web Clipper integration
-- **chatgpt**: ChatGPT AI assistant desktop app
-- **claude**: Claude AI assistant desktop app
-- **cursor**: Cursor AI-powered code editor
+The role at `~/.ansible/roles/ansible-role-dotmodules/` is installed from:
+```
+https://github.com/getfatday/ansible-role-dotmodules.git
+```
 
-### Obsidian Module Details
-The Obsidian module provides a complete knowledge management system:
-- **Applications**: Obsidian.app (Homebrew Cask) + Obsidian Web Clipper (Mac App Store)
-- **Templates**: Daily notes, meeting notes, project notes, web clips
-- **Configuration**: CSS snippets, setup scripts, vault management tools
-- **Location**: `~/.config/obsidian/` (templates, snippets, scripts, plugins)
-- **Scripts**: `~/.config/obsidian/scripts/setup-obsidian.sh`
-- **Commands**: `obsidian`, `obsidian-vault`, `obsidian-templates`
+**Critical fixes applied (2025-10-11)**:
+- Commit a7eba7b: Configuration merging, --adopt flag, direct Homebrew modules
+- Commit ab3e695: --adopt for merged files
+- Commit c31bffe: Extract filter compatibility (Ansible 2.19+)
 
-## Deployment Verification
+## Spec-Kit Integration
 
-### Testing Process
-1. **Dry Run**: `ansible-playbook -i inventory deploy.yml --check`
-2. **Verify Apps**: Check `/Applications/` for installed apps
-3. **Verify Configs**: Check `~/.config/` for deployed files
-4. **Test Functionality**: Run setup scripts and verify commands work
+### Slash Commands Available
+Press `Cmd+K` in Cursor, then type `/speckit.` to see:
+- `/speckit.constitution` - Update principles (v1.0.0 established)
+- `/speckit.specify` - Create feature specifications
+- `/speckit.clarify` - Interactive clarification
+- `/speckit.plan` - Technical planning
+- `/speckit.tasks` - Task breakdown
+- `/speckit.implement` - Execute implementation
+- `/speckit.analyze` - Consistency checks
+- `/speckit.checklist` - Quality gates
 
-### Common Issues
-- **GNU Stow Conflicts**: Avoid `.local/bin/` conflicts between modules
-- **Homebrew Permissions**: Sudo password required for Homebrew operations
-- **Mac App Store**: Apps may already be installed (skipped in deployment)
-- **Architecture Detection**: ARM64 vs x86_64 Homebrew paths
+### When to Use Spec-Kit
+- ✅ Adding new complex modules (e.g., development environments)
+- ✅ Major refactoring or architectural changes
+- ✅ Multi-file module configurations
+- ❌ Simple single-file edits
+- ❌ Documentation-only changes
 
-## Related Files
+## Testing & Deployment
 
-- `ansible-role-dotmodules/`: The core role implementation
-- `tests/`: Test configurations and examples
-- `playbooks/`: Deployment playbooks
-- `modules/`: Individual dotfile modules
+### Before Committing
+```bash
+# 1. Test deployment in check mode
+ansible-playbook -i playbooks/inventory playbooks/deploy.yml --check
+
+# 2. Test actual deployment
+ansible-playbook -i playbooks/inventory playbooks/deploy.yml
+
+# 3. Verify success (should show failed=0)
+# 4. Check installed applications/packages
+```
+
+### Module Testing Checklist
+- [ ] config.yml syntax valid
+- [ ] files/README.md comprehensive
+- [ ] Module in deploy.yml install list
+- [ ] Deployment succeeds without errors
+- [ ] Application/package installed correctly
+- [ ] No stow conflicts
+- [ ] Constitution principles satisfied
+
+## Architecture-Specific Notes
+
+### Apple Silicon (ARM64)
+- Homebrew prefix: `/opt/homebrew`
+- Python: `/opt/homebrew/bin/python3.X`
+
+### Intel (x86_64)
+- Homebrew prefix: `/usr/local`
+- May require Rosetta 2 for some apps
+
+## File Merging System
+
+Files declared in `mergeable_files` are:
+1. Collected from all contributing modules
+2. Merged into `~/.dotmodules/merged/` 
+3. Deployed as unified files
+4. Excluded from regular stow process
+
+**Modules with mergeable files are filtered out** from regular stow deployment to prevent conflicts.
+
+## Quick Tips
+
+- Use `git stash -u` to temporarily hide untracked files
+- Run `specify check` to verify AI tools available
+- Check `~/.local/bin` in PATH for UV-installed tools
+- Constitution v1.0.0 ratified 2025-10-11
+- Always test changes with Ansible before pushing
+
+---
+
+*This file provides context to Cursor AI for better assistance with dotfiles development. See CURSOR.md for comprehensive development guidelines.*

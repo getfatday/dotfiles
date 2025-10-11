@@ -2,9 +2,14 @@
 
 A comprehensive dotfiles management system using the `ansible-role-dotmodules` role for automated system configuration and dotfile deployment.
 
+**Governance**: See [Constitution v1.0.0](.specify/memory/constitution.md) for project principles  
+**AI-Assisted Development**: Integrated with [GitHub Spec-Kit](https://github.com/github/spec-kit) for spec-driven development
+
 ## Overview
 
 This repository contains modular dotfile configurations that can be deployed using Ansible automation. Each module is self-contained and can be mixed and matched to create a personalized development environment.
+
+All development follows the [8 core principles](.specify/memory/constitution.md) defined in the project constitution, ensuring modularity, idempotency, automation, and quality.
 
 ## Repository Structure
 
@@ -174,13 +179,45 @@ Run with verbose output to see what's happening:
 ansible-playbook -i inventory playbook.yml -v
 ```
 
+## Development with Spec-Kit
+
+This repository uses [GitHub Spec-Kit](https://github.com/github/spec-kit) for spec-driven development with Cursor AI.
+
+### Quick Start
+
+Press `Cmd+K` in Cursor and use slash commands:
+
+1. **Create specification**: `/speckit.specify Add Firefox module with developer edition`
+2. **Create plan**: `/speckit.plan Install via Homebrew, configure for development`
+3. **Generate tasks**: `/speckit.tasks`
+4. **Implement**: `/speckit.implement`
+
+### Available Commands
+
+- `/speckit.constitution` - View/update project principles
+- `/speckit.specify` - Create feature specifications
+- `/speckit.clarify` - Interactive requirement clarification
+- `/speckit.plan` - Generate implementation plans
+- `/speckit.tasks` - Break down into actionable tasks
+- `/speckit.implement` - Execute implementation
+- `/speckit.analyze` - Verify cross-artifact consistency
+- `/speckit.checklist` - Quality validation gates
+
+### Constitution
+
+All development must comply with [8 core principles](.specify/memory/constitution.md):
+- Modularity, Idempotency, Automation-First, Cross-Platform Awareness
+- Configuration Merging, Documentation-First, Version Control, Declarative Over Imperative
+
+See [CURSOR.md](./CURSOR.md) for comprehensive development guidelines and patterns.
+
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Add your module or improvements
-4. Test thoroughly
-5. Submit a pull request
+2. Use spec-kit workflow for new features (`/speckit.specify` → `/speckit.plan` → `/speckit.implement`)
+3. Ensure constitution compliance (all 8 principles)
+4. Test deployment thoroughly
+5. Submit a pull request with spec documentation
 
 ## License
 
@@ -191,3 +228,4 @@ MIT License - see LICENSE file for details.
 - Built on top of [ansible-role-dotmodules](https://github.com/getfatday/ansible-role-dotmodules)
 - Uses [GNU Stow](https://www.gnu.org/software/stow/) for dotfile management
 - Integrates with [Homebrew](https://brew.sh/) for package management
+- Spec-driven development powered by [GitHub Spec-Kit](https://github.com/github/spec-kit)
