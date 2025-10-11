@@ -47,3 +47,8 @@ Temporary Items
 *.bak
 *.backup
 modules/merged/
+# Spec-kit
+.cursor/agent_memory/
+.cursor/tmp/
+# Keep .cursor/commands/ for custom slash commands
+# Keep .specify/ for spec-kit templates and scripts
