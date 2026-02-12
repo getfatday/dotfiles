@@ -1,0 +1,10 @@
+---
+# VS Code module
+# Microsoft Visual Studio Code editor
+
+# VS Code from Homebrew Cask
+homebrew_casks:
+  - visual-studio-code
+
+# Note: This module provides:
+# - Microsoft Visual Studio Code editor from Homebrew Cask

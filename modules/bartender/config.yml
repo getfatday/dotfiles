@@ -1,0 +1,10 @@
+---
+# Bartender module
+# Menu bar icon manager and organizer
+
+# Bartender from Homebrew Cask
+homebrew_casks:
+  - bartender
+
+# Note: This module provides:
+# - Bartender menu bar icon manager and organizer

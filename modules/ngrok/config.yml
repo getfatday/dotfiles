@@ -1,0 +1,10 @@
+---
+# ngrok module
+# Secure tunneling to localhost
+
+# ngrok from Homebrew Cask
+homebrew_casks:
+  - ngrok
+
+# Note: This module provides:
+# - ngrok secure tunneling to localhost for development and webhooks

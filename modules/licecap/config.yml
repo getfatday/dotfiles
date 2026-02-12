@@ -1,0 +1,10 @@
+---
+# LICEcap module
+# Animated GIF screen capture tool
+
+# LICEcap from Homebrew Cask
+homebrew_casks:
+  - licecap
+
+# Note: This module provides:
+# - LICEcap animated GIF screen capture tool

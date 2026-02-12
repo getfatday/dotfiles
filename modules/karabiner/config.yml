@@ -1,0 +1,10 @@
+---
+# Karabiner Elements module
+# Keyboard customization utility for macOS
+
+# Karabiner Elements from Homebrew Cask
+homebrew_casks:
+  - karabiner-elements
+
+# Note: This module provides:
+# - Karabiner Elements keyboard customization utility (key remapping, complex modifications)

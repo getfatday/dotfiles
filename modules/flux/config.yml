@@ -1,0 +1,10 @@
+---
+# f.lux module
+# Blue light filter for reducing eye strain
+
+# f.lux from Homebrew Cask
+homebrew_casks:
+  - flux
+
+# Note: This module provides:
+# - f.lux blue light filter for reducing eye strain

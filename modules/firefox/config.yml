@@ -1,0 +1,10 @@
+---
+# Firefox module
+# Mozilla Firefox web browser
+
+# Firefox from Homebrew Cask
+homebrew_casks:
+  - firefox
+
+# Note: This module provides:
+# - Mozilla Firefox web browser from Homebrew Cask

@@ -1,0 +1,10 @@
+---
+# Sequel Ace module
+# MySQL/MariaDB database management GUI
+
+# Sequel Ace from Homebrew Cask
+homebrew_casks:
+  - sequel-ace
+
+# Note: This module provides:
+# - Sequel Ace MySQL/MariaDB database management GUI (successor to Sequel Pro)

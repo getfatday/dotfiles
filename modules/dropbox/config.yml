@@ -1,0 +1,10 @@
+---
+# Dropbox module
+# Cloud file storage and sync
+
+# Dropbox from Homebrew Cask
+homebrew_casks:
+  - dropbox
+
+# Note: This module provides:
+# - Dropbox cloud file storage and sync
