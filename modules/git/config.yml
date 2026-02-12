@@ -1,8 +1,10 @@
 homebrew_packages:
   - git
   - git-delta
-  - gh
+  - git-filter-repo    # Git history rewriting tool (replacement for filter-branch)
   - git-flow
+  - git-quick-stats    # Git repository statistics
+  - gh
 
 homebrew_casks:
   - kaleidoscope

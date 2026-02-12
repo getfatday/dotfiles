@@ -5,8 +5,16 @@
 # Productivity dependencies
 homebrew_packages:
   - autojump
-  - z
+  - dos2unix      # Line ending conversion
   - fzf
+  - gnu-sed       # GNU sed (macOS sed is BSD, limited)
+  - jq            # JSON processor
+  - nginx         # Web server (local development)
+  - rename        # Batch file rename (Perl rename utility)
+  - rsync         # File sync (newer than macOS built-in)
+  - stow          # GNU Stow (used by dotfiles system)
+  - wget          # HTTP fetcher
+  - z
 
 # Stow directories for productivity configs
 stow_dirs:

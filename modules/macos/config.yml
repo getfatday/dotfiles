@@ -4,7 +4,9 @@
 
 # System configuration tools
 homebrew_packages:
-  - mas  # Mac App Store CLI
+  - ical-buddy    # Calendar CLI (reads macOS Calendar)
+  - mas           # Mac App Store CLI
+  - things.sh     # Things 3 CLI interface
 
 # Common Mac App Store applications
 mas_installed_apps:

@@ -2,6 +2,14 @@
 # Obsidian module
 # Note-taking and knowledge management with web clipping capabilities
 
+# Obsidian tap for CLI tools
+homebrew_taps:
+  - yakitrak/yakitrak
+
+# Obsidian CLI tools
+homebrew_packages:
+  - obsidian-cli    # CLI for Obsidian vault operations
+
 # Obsidian application
 homebrew_casks:
   - obsidian
