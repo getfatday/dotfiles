@@ -35,15 +35,12 @@
 
 ## Phase 2: Git Module Overhaul
 
-**Goal:** Update `modules/git/` with all missing config from old laptop.
+**Goal:** Update `modules/git/` with all missing config from old laptop — SSH signing, Kaleidoscope, credential helpers, global gitignore, and best practices.
 
-### Tasks
-1. Update `.gitconfig` with SSH signing configuration (if not already present)
-2. Add Kaleidoscope diff/merge tool config
-3. Set default branch to `main`
-4. Add useful aliases found in audit
-5. Ensure credential helper uses 1Password (no hardcoded tokens)
-6. Add global `.gitignore` if missing entries found
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — Update .gitconfig, create global gitignore, update config.yml
 
 ### Acceptance Criteria
 - [ ] `modules/git/files/.gitconfig` reflects all personal git config
