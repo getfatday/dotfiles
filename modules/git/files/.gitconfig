@@ -1,27 +1,66 @@
 [user]
   name = Ian Anderson
+  # TODO: Set your personal email (must match GitHub account for commit attribution)
   email = ianderson@example.com
+  # TODO: Set your SSH signing key from 1Password (public key, ssh-ed25519 format)
+  # See: https://developer.1password.com/docs/ssh/git-commit-signing/
+  signingkey = <configure via 1Password>
+
 [core]
   editor = vi
-  excludesfile = ~/.gitignore
+  excludesfile = ~/.config/git/ignore
   autocrlf = input
+
+[gpg]
+  format = ssh
+[gpg "ssh"]
+  program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+
+[commit]
+  gpgsign = true
+
 [color]
   branch = auto
   diff = auto
   interactive = auto
   status = auto
+
 [init]
-  defaultBranch = master
-[web]
-  browser = google-chrome
+  defaultBranch = main
+
 [credential]
   helper = osxkeychain
+[credential "https://github.com"]
+  helper =
+  helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+  helper =
+  helper = !/opt/homebrew/bin/gh auth git-credential
+
 [push]
   default = simple
-[merge]
-  tool = kdiff3
+
+[pull]
+  rebase = true
+
+[rebase]
+  autosquash = true
+
+[diff]
+  tool = Kaleidoscope
+[difftool "Kaleidoscope"]
+  cmd = ksdiff --partial-changeset --relative-path \"$MERGED\" -- \"$LOCAL\" \"$REMOTE\"
 [difftool]
   prompt = false
+
+[merge]
+  tool = Kaleidoscope
+[mergetool "Kaleidoscope"]
+  cmd = ksdiff --merge --output \"$MERGED\" --base \"$BASE\" -- \"$LOCAL\" --snapshot \"$REMOTE\" --snapshot
+  trustExitCode = true
+[mergetool]
+  prompt = false
+
 [alias]
   c = commit
   ca = commit -a
@@ -32,5 +71,6 @@
   l = log --graph --pretty=format:"%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset" --abbrev-commit
   open = "!~/.local/bin/git-open"
   browse = "!~/.local/bin/git-open"
-[pull]
-	rebase = true
+
+[web]
+  browser = google-chrome

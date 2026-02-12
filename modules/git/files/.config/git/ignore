@@ -1,0 +1,17 @@
+# Global gitignore - user-specific patterns
+# Applied via core.excludesfile = ~/.config/git/ignore
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Tools
+**/.claude/settings.local.json

@@ -1,38 +1,15 @@
----
-# Git configuration module with full dependency tree
-# Based on legacy .gitconfig analysis
-
-# Core git dependencies
 homebrew_packages:
   - git
   - git-delta
   - gh
   - git-flow
 
-# Git merge tool
 homebrew_casks:
-  - kdiff3
+  - kaleidoscope
 
-# Browser for git web operations
-homebrew_casks:
-  - google-chrome
-
-# Stow directories for git configs
 stow_dirs:
   - git
 
-# Files that should be merged with other modules
 mergeable_files:
-  - ".zpreztorc"  # Enable git module in Prezto
-  - ".zshrc"      # Git aliases and functions
-
-# Note: This module provides:
-# - User configuration (name, email)
-# - Core settings (editor, autocrlf, excludesfile)
-# - Color configuration
-# - Git aliases (c, ca, cm, cam, d, dc, l)
-# - Pull rebase and merge tool settings
-# - Credential helper (osxkeychain)
-# - Default branch configuration
-# - Prezto git module integration
-# - Advanced Git aliases merged into shell configuration
+  - ".zpreztorc"
+  - ".zshrc"
