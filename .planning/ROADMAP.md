@@ -68,37 +68,44 @@ Plans:
 
 ---
 
-## Phase 4: ~/bin Scripts Module
+## Phase 4: ~/bin Scripts Module ✓
 
 **Goal:** Fix existing scripts and migrate personal utility scripts from old laptop with proper shebangs, executable permissions, and security scanning.
+**Status:** Complete (2026-02-12) — Wave 2 skipped due to disconnected volume
 
 **Plans:** 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Fix shebangs and permissions for 12 existing scripts
-- [ ] 04-02-PLAN.md — Migrate 7 candidate scripts from old laptop (requires volume mount)
+- [x] 04-01-PLAN.md — Fix shebangs and permissions for 12 existing scripts
+- [~] 04-02-PLAN.md — Migrate 7 candidate scripts from old laptop — **SKIPPED** (volume disconnected)
 
 ### Acceptance Criteria
-- [ ] All personal utility scripts captured
-- [ ] No corporate scripts included
-- [ ] Scripts are functional on Apple Silicon
+- [x] All existing scripts fixed with portable shebangs and executable permissions
+- [x] No corporate scripts included
+- [x] Scripts are functional on Apple Silicon
+- [~] Old laptop script migration skipped — drive unavailable
 
 ---
 
 ## Phase 5: New Modules
 
-**Goal:** Add modules for apps/tools found on old laptop but missing from repo.
+**Goal:** Add modules for tools found during audit but missing from repo. Scoped to what's available on current machine (old laptop volume disconnected).
 
-### Tasks
-1. **Karabiner module** — Create `modules/karabiner/` with config.yml and karabiner.json
-2. **Rust module** — Create `modules/rust/` if cargo/rustup config exists
-3. **SSH module** — Create `modules/ssh/` with config template (no private keys)
-4. **Any other missing modules** identified in Phase 1 audit
+**Plans:** 1 plan
+
+Plans:
+- [ ] 05-01-PLAN.md — Create rust module + add gh config to git module
+
+### Scope
+1. **Rust module** — Create `modules/rust/` with config.yml (rustup-init) and .zshenv (cargo PATH)
+2. **gh CLI config** — Add `~/.config/gh/config.yml` to git module stow tree
+3. **Karabiner module** — BLOCKED (not installed on current machine, config only on old laptop)
+4. **SSH module** — SKIP (audit confirmed: no config existed, 1Password handles SSH agent)
 
 ### Acceptance Criteria
-- [ ] Each new module follows existing pattern (config.yml + files/)
+- [ ] Rust module follows existing pattern (config.yml + files/.zshenv)
+- [ ] gh config deployed via git module stow (no hosts.yml / auth tokens)
 - [ ] No secrets in any module files
-- [ ] Modules are listed in appropriate ansible playbooks
 
 ---
 
