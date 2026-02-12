@@ -5,7 +5,7 @@
 - **Phase:** 7/7 (Validation & Deploy)
 - **Plan:** 1 of 1 complete
 - **Status:** All phases complete — real deploy deferred to interactive terminal
-- **Last activity:** 2026-02-12 — Validated repo (secrets, corporate, dry-run), deploy.yml updated to 36 modules
+- **Last activity:** 2026-02-12 — Fixed stow --no-folding conflict in ansible-role-dotmodules (quick task 1)
 
 Progress: ██████████ 100% (7/7 phases complete)
 
@@ -24,6 +24,7 @@ Progress: ██████████ 100% (7/7 phases complete)
 | 05 | Guard cargo env with file existence test | Prevents errors if rustup not yet initialized |
 | 05 | Exclude hosts.yml from git module | Contains OAuth tokens from gh auth login |
 | 07 | Defer real deploy to interactive terminal | MAS apps require sudo password via --ask-become-pass |
+| quick-1 | Disabled SSH signing for ansible-role-dotmodules commits | Same placeholder SSH key issue as dotfiles repo |
 
 ## Blockers/Concerns Carried Forward
 
@@ -34,5 +35,6 @@ Progress: ██████████ 100% (7/7 phases complete)
 ## Session Continuity
 
 - **Last session:** 2026-02-12
-- **Stopped at:** All phases complete
+- **Stopped at:** Quick task 1 complete — Fixed stow --no-folding in ansible-role-dotmodules upstream repo
+- **Resume file:** All phases complete; ready for interactive deploy
 - **Remaining:** Run `ansible-playbook playbooks/deploy.yml -i playbooks/inventory --ask-become-pass --diff` interactively
