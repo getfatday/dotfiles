@@ -13,3 +13,4 @@ stow_dirs:
 mergeable_files:
   - ".zpreztorc"
   - ".zshrc"
+  - ".zshenv"
