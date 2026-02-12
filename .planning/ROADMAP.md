@@ -52,14 +52,13 @@ Plans:
 
 ## Phase 3: Shell Module Update
 
-**Goal:** Capture all missing shell config from old laptop.
+**Goal:** Capture all missing shell config from old laptop — Prezto init, git aliases, cross-arch paths, module .zshenv files, and Claude alias.
 
-### Tasks
-1. Add missing aliases to zsh module
-2. Add missing shell functions
-3. Update PATH entries (respecting Intel→ARM Homebrew path differences)
-4. Add missing completions or plugins
-5. Ensure corporate PATH entries are excluded
+**Plans:** 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Prezto init + git alias fixes (zsh and git modules)
+- [ ] 03-02-PLAN.md — Node cross-arch paths, speckit .zshenv, Claude yolo alias
 
 ### Acceptance Criteria
 - [ ] `modules/zsh/` has all personal shell config
