@@ -33,19 +33,20 @@
 
 ---
 
-## Phase 2: Git Module Overhaul
+## Phase 2: Git Module Overhaul ✓
 
 **Goal:** Update `modules/git/` with all missing config from old laptop — SSH signing, Kaleidoscope, credential helpers, global gitignore, and best practices.
+**Status:** Complete (2026-02-12)
 
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — Update .gitconfig, create global gitignore, update config.yml
+- [x] 02-01-PLAN.md — Update .gitconfig, create global gitignore, update config.yml
 
 ### Acceptance Criteria
-- [ ] `modules/git/files/.gitconfig` reflects all personal git config
-- [ ] No corporate git config included
-- [ ] SSH signing configured (key reference, not actual key)
+- [x] `modules/git/files/.gitconfig` reflects all personal git config
+- [x] No corporate git config included
+- [x] SSH signing configured (key reference, not actual key)
 
 ---
 
