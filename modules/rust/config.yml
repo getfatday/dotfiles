@@ -1,0 +1,20 @@
+---
+# Rust toolchain module
+# Rust programming language via rustup
+
+# Rust dependencies
+homebrew_packages:
+  - rustup-init  # Rust toolchain installer (manages rustc, cargo, etc.)
+
+stow_dirs:
+  - rust
+
+mergeable_files:
+  - ".zshenv"
+
+# Note: This module provides:
+# - Rust toolchain via rustup (rustc, cargo, clippy, rustfmt)
+# - Cargo PATH integration via .zshenv
+#
+# After deployment, run: rustup-init to initialize the toolchain
+# Or if already initialized, rustup will manage updates
