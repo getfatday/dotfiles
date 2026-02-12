@@ -57,7 +57,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Prezto init + git alias fixes (zsh and git modules)
+- [x] 03-01-PLAN.md — Prezto init + git alias fixes (zsh and git modules)
 - [ ] 03-02-PLAN.md — Node cross-arch paths, speckit .zshenv, Claude yolo alias
 
 ### Acceptance Criteria
