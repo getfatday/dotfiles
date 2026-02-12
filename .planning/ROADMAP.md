@@ -70,14 +70,13 @@ Plans:
 
 ## Phase 4: ~/bin Scripts Module
 
-**Goal:** Capture personal utility scripts.
+**Goal:** Fix existing scripts and migrate personal utility scripts from old laptop with proper shebangs, executable permissions, and security scanning.
 
-### Tasks
-1. Copy personal scripts from old laptop's `~/bin/` to `modules/bin/files/bin/`
-2. Filter out corporate/Expedia scripts
-3. Filter out scripts that reference hardcoded paths or secrets
-4. Ensure scripts are executable and have proper shebangs
-5. Update `modules/bin/config.yml` if needed
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Fix shebangs and permissions for 12 existing scripts
+- [ ] 04-02-PLAN.md — Migrate 7 candidate scripts from old laptop (requires volume mount)
 
 ### Acceptance Criteria
 - [ ] All personal utility scripts captured
