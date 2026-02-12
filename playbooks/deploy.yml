@@ -7,25 +7,42 @@
       repo: "file://{{ playbook_dir }}/../modules"
       dest: "{{ ansible_env.HOME }}/.dotmodules"
       install:
-        - git
-        - macos
         - 1password
-        - zsh
-        - handbrake
-        - finances
-        - node
-        - iterm
         - alfred
-        - obsidian
+        - bartender
+        - bin
         - chatgpt
+        - chrome
         - claude
         - cursor
-        - chrome
-        - grammarly
+        - database
         - docker
+        - dropbox
         - editor
+        - finances
+        - firefox
+        - flux
+        - git
+        - go
+        - grammarly
+        - handbrake
+        - iterm
+        - karabiner
+        - licecap
+        - macos
+        - media
+        - ngrok
+        - node
+        - obsidian
         - productivity
+        - rust
+        - security
+        - sequel-ace
         - speckit
+        - spotify
+        - tmux
+        - vscode
+        - zsh
     # Configure MAS path for x86_64 Macs
     mas_path: "/usr/local/bin/mas"
   roles:
