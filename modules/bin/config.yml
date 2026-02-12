@@ -1,0 +1,5 @@
+---
+# User scripts and utilities
+# Standalone scripts captured from ~/bin/
+stow_dirs:
+  - bin

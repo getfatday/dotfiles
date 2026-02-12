@@ -1,0 +1,13 @@
+---
+# Spotify module
+# Spotify music streaming application
+
+# Spotify from Homebrew Cask
+homebrew_casks:
+  - spotify
+
+# Note: This module provides:
+# - Spotify music streaming application
+# - Cross-platform compatibility (ARM64/x86_64)
+# - Automated installation via Ansible
+# - No configuration files (app-only module)
