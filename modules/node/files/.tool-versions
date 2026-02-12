@@ -1,5 +1,2 @@
-# asdf tool versions
-# This file specifies which versions of tools to use
-# Run 'asdf install' to install all tools listed here
-
-nodejs 20.11.0
+nodejs 25.2.1
+jq 1.7.1
