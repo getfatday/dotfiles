@@ -1,0 +1,14 @@
+---
+# Security module
+# GPG encryption and secret management tools
+
+# Security dependencies
+homebrew_packages:
+  - gnupg        # GNU Privacy Guard (GPG encryption)
+  - pinentry-mac # macOS-native GPG passphrase entry dialog
+  - sops         # Mozilla SOPS encrypted file editor
+
+# Note: This module provides:
+# - GnuPG for encryption, signing, and key management
+# - macOS Keychain-integrated pinentry for GPG passphrases
+# - SOPS for encrypting/decrypting secret files (YAML, JSON, ENV)

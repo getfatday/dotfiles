@@ -1,0 +1,13 @@
+---
+# Tmux module
+# Terminal multiplexer for persistent sessions
+
+# Tmux dependencies
+homebrew_packages:
+  - tmux                          # Terminal multiplexer
+  - reattach-to-user-namespace    # macOS clipboard fix for tmux
+
+# Note: This module provides:
+# - tmux terminal multiplexer for session management
+# - macOS clipboard integration via reattach-to-user-namespace
+# - Enables persistent terminal sessions across SSH disconnects

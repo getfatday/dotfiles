@@ -1,0 +1,12 @@
+---
+# Go module
+# Go programming language
+
+# Go dependencies
+homebrew_packages:
+  - go  # Go programming language compiler and tools
+
+# Note: This module provides:
+# - Go compiler and standard library
+# - go build, go test, go fmt, go vet tools
+# - GOPATH and GOBIN environment (configure in .zshenv if needed)

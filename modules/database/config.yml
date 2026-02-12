@@ -1,0 +1,12 @@
+---
+# Database module
+# Database servers for local development
+
+# Database dependencies
+homebrew_packages:
+  - postgresql@14  # PostgreSQL relational database (version 14)
+
+# Note: This module provides:
+# - PostgreSQL 14 for local development databases
+# - psql CLI client
+# - Version pinned at 14 for compatibility with existing projects

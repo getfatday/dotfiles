@@ -1,0 +1,15 @@
+---
+# Media module
+# Media processing and streaming tools
+
+# Media processing dependencies
+homebrew_packages:
+  - ffmpeg        # Audio/video processing and conversion
+  - imagemagick   # Image manipulation and conversion
+  - streamlink    # Stream extraction from various services
+
+# Note: This module provides:
+# - ffmpeg for video/audio transcoding
+# - ImageMagick for image processing (convert, mogrify, identify)
+# - Streamlink for extracting streams from web services
+# - ffmpeg brings many codec dependencies automatically
