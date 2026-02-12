@@ -112,13 +112,13 @@ Plans:
 
 ## Phase 6: Homebrew Reconciliation
 
-**Goal:** Ensure Brewfile captures all packages from old laptop worth keeping.
+**Goal:** Ensure all personal Homebrew packages from old laptop audit are declared in module configs, with no corporate packages included.
 
-### Tasks
-1. Compare old laptop's installed packages with module-declared packages
-2. Add missing packages to appropriate modules' config.yml
-3. Remove any corporate-only packages (Zscaler, Jamf, etc.)
-4. Ensure cask vs formula distinction is correct
+**Plans:** 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Add missing formulas to existing modules + create new formula modules
+- [ ] 06-02-PLAN.md — Create cask-only modules for GUI apps + validate reconciliation
 
 ### Acceptance Criteria
 - [ ] All personal Homebrew packages are declared in module configs
