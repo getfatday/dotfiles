@@ -58,12 +58,12 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — Prezto init + git alias fixes (zsh and git modules)
-- [ ] 03-02-PLAN.md — Node cross-arch paths, speckit .zshenv, Claude yolo alias
+- [x] 03-02-PLAN.md — Node cross-arch paths, speckit .zshenv, Claude yolo alias
 
 ### Acceptance Criteria
-- [ ] `modules/zsh/` has all personal shell config
-- [ ] PATH handles both `/opt/homebrew` (ARM) and `/usr/local` (Intel) gracefully
-- [ ] No corporate shell config included
+- [x] `modules/zsh/` has all personal shell config
+- [x] PATH handles both `/opt/homebrew` (ARM) and `/usr/local` (Intel) gracefully
+- [x] No corporate shell config included
 
 ---
 
