@@ -10,6 +10,9 @@ homebrew_casks:
 stow_dirs:
   - claude
 
+mergeable_files:
+  - ".zshrc"
+
 # Note: This module provides:
 # - Claude desktop application for AI conversations
 # - Configuration files for Claude settings

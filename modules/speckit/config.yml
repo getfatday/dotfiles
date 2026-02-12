@@ -6,6 +6,12 @@
 homebrew_packages:
   - uv  # Fast Python package installer and manager
 
+stow_dirs:
+  - speckit
+
+mergeable_files:
+  - ".zshenv"
+
 # Note: This module provides:
 # - UV package manager for Python tools
 # - Spec-kit CLI tool (installed via uv tool install)
