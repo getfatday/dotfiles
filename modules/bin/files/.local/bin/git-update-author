@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+#/ usage: git-update-author <find-email> [replace-email]
+#/
+#/   find-email    - email address to find in commits
+#/   replace-email - email address to replace
+#/                   (default: git config user.email)
+#/
+#/ example:
+#/
+#/   git-update-author me@gmail.com me@example.com
+error() {
+    echo "error: $@" >&2
+    usage
+    exit 1
+}
+
+usage() {
+    cat $0 | grep '^#/' | cut -c4-
+}
+
+find=$1
+replace=${2-$(git config user.email)}
+refs=".git/refs/original"
+
+[ -z "${find}" ] &&
+error "missing find-email argument"
+
+[ -z "${replace}" ] &&
+error "missing replace-email argument"
+
+filter="
+[ \"\$GIT_COMMITTER_EMAIL\" = \"${find}\" ] &&
+export GIT_COMMITTER_EMAIL=\"${replace}\"
+
+[ \"\$GIT_AUTHOR_EMAIL\" = \"${find}\" ] &&
+export GIT_AUTHOR_EMAIL=\"${replace}\"
+
+echo
+"
+
+git filter-branch --env-filter "${filter}"
+
+[ -d "${refs}" ] &&
+rm -fr "${refs}"

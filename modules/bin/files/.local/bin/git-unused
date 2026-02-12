@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+usage()
+{
+  echo "usage: git unused [-D]"
+}
+
+while getopts "hD" opt; do
+  case $opt in
+    h)
+      usage
+      exit 1
+      ;;
+    D)
+      DELETE="1"
+      ;;
+    \?)
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+git branch -vv | grep 'origin/.*: gone]' | awk '{print $1}' | while read branch; do
+    if [ ! -z "$DELETE" ]; then
+        git branch -D $branch
+    else
+        echo Would remove $branch
+    fi
+done

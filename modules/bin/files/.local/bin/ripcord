@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+error () {
+    echo "error: $@" >&2;
+    exit 1;
+}
+
+select dest in /Volumes/*
+do
+  echo "Selected Volume: $dest"
+  break;
+done
+
+[ -z "${dest}" ] &&
+error "Destination Required";
+
+nohup rsync -az --info=progress2 --delete --filter=':- .gitignore' ~/{.dotfiles,src} ${dest}/`scutil --get LocalHostName` &

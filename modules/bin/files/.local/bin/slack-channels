@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+slack-api -X POST \
+    --data '{"types":"public_channel,private_channel"}' \
+    --paginate \
+    conversations.list

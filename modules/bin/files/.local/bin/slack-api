@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+token="$(slack-token)"
+
+get-collection-name () {
+  jq --slurp -r '.[] | to_entries[] | select(.value | type == "array") | .key'
+}
+
+get-item-name () {
+  jq --slurp -r '.[] | to_entries[] | select(.value | type == "object") | .key'
+}
+
+get-cursor () {
+  jq -r '.response_metadata.next_cursor'
+}
+
+get-collection () {
+  jq -r -c '.'$1'[]'
+}
+
+get-item () {
+  jq -r -c '.'$1
+}
+
+fetch() {
+  curl -s -H "Authorization: Bearer $token" -H 'Content-type: application/json' $@
+}
+
+api () {
+  local args=()
+  local paginate=false
+  local limit=1000
+  local page
+  local key
+
+  # Check if the --paginate flag was passed
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --paginate)
+        paginate=true
+        shift
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  if $paginate; then
+    args=("${args[@]/--paginate}")
+  fi
+
+  endpoint="${args[@]: -1}"
+  entrypoint=${endpoint##*.}
+  unset 'args[${#args[@]}-1]'
+  url=https://slack.com/api/$endpoint
+
+  if $paginate; then
+    page=$(fetch -d "limit=$limit" ${args[@]} $url)
+    key=$(echo "$page" | get-collection-name)
+    echo "$page" | get-collection $key
+    local cursor=$(echo "$page" | get-cursor)
+    while [[ ! -z $cursor ]]; do
+      page=$(fetch -d "limit=$limit" -d "cursor=$cursor" ${args[@]} $url)
+      echo "$page" | get-collection $key
+      cursor=$(echo "$page" | get-cursor)
+    done
+  else
+    page=$(fetch ${args[@]} $url)
+    key=$(echo "$page" | get-item-name)
+    echo "$page" | get-item $key
+  fi
+}
+
+api $@

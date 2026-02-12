@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+# Fail fast on errors and unset vars
+set -euo pipefail
+
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 FOLDER SEARCH_TERM [SEARCH_TERM...]"
+  exit 1
+fi
+
+SEARCH_FOLDER="$1"
+shift  # Remove the first argument so $@ is now all the search terms
+
+# Determine absolute path and Git repo root
+ABS_FOLDER=$(realpath "$SEARCH_FOLDER")
+REPO_ROOT=$(git -C "$ABS_FOLDER" rev-parse --show-toplevel 2>/dev/null) || {
+  echo "❌ '$ABS_FOLDER' is not inside a Git repository."
+  exit 1
+}
+
+# Calculate the relative folder path from the Git root
+REL_FOLDER="${ABS_FOLDER#$REPO_ROOT/}"
+
+cd "$REPO_ROOT"
+
+for SEARCH_TERM in "$@"; do
+  echo "🔍 Searching for first commit with '$SEARCH_TERM' in $REL_FOLDER..."
+
+  commit=$(git log --reverse -S"$SEARCH_TERM" --pretty=format:"%H" -- "$REL_FOLDER" | head -n 1 || true)
+
+  if [ -z "$commit" ]; then
+    echo "  ❌ Not found"
+  else
+    info=$(git show -s --format="%h | %an | %ad | %s" "$commit")
+    echo "  ✅ $info"
+  fi
+
+  echo ""
+done
