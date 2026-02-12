@@ -3,11 +3,11 @@
 ## Current Position
 
 - **Phase:** 5/7 (New Modules)
-- **Plan:** Not yet planned
-- **Status:** Planning
-- **Last activity:** 2026-02-12 — Phase 4 complete (04-02 skipped, volume disconnected)
+- **Plan:** 1 of 1 complete
+- **Status:** Phase complete
+- **Last activity:** 2026-02-12 — Completed 05-01-PLAN.md (rust and gh CLI modules)
 
-Progress: ████░░░░░░ 57% (4/7 phases complete)
+Progress: █████░░░░░ 71% (5/7 phases complete)
 
 ## Decisions Made
 
@@ -21,6 +21,8 @@ Progress: ████░░░░░░ 57% (4/7 phases complete)
 | 03 | Use brew --prefix instead of architecture detection | More reliable than uname -m, handles relocatable installs |
 | 03 | Remove hardcoded paths from node module PATH | Homebrew and Python paths belong in respective modules, not node module |
 | 04 | Skip 04-02 old laptop script migration | Old laptop volume at /Volumes/Macintosh HD-1/ is disconnected |
+| 05 | Guard cargo env with file existence test | Prevents errors if rustup not yet initialized |
+| 05 | Exclude hosts.yml from git module | Contains OAuth tokens from gh auth login |
 
 ## Blockers/Concerns Carried Forward
 
@@ -31,5 +33,5 @@ Progress: ████░░░░░░ 57% (4/7 phases complete)
 ## Session Continuity
 
 - **Last session:** 2026-02-12
-- **Stopped at:** Phase 4 complete, Phase 5 needs planning
-- **Resume file:** .planning/ROADMAP.md (Phase 5: New Modules)
+- **Stopped at:** Phase 5 complete
+- **Resume file:** .planning/ROADMAP.md (Phase 6: Documentation)
