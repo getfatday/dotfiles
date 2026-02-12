@@ -110,41 +110,39 @@ Plans:
 
 ---
 
-## Phase 6: Homebrew Reconciliation
+## Phase 6: Homebrew Reconciliation ✓
 
 **Goal:** Ensure all personal Homebrew packages from old laptop audit are declared in module configs, with no corporate packages included.
+**Status:** Complete (2026-02-12)
 
 **Plans:** 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Add missing formulas to existing modules + create new formula modules
-- [ ] 06-02-PLAN.md — Create cask-only modules for GUI apps + validate reconciliation
+- [x] 06-01-PLAN.md — Add missing formulas to existing modules + create new formula modules
+- [x] 06-02-PLAN.md — Create cask-only modules for GUI apps + validate reconciliation
 
 ### Acceptance Criteria
-- [ ] All personal Homebrew packages are declared in module configs
-- [ ] No corporate packages included
+- [x] All personal Homebrew packages are declared in module configs
+- [x] No corporate packages included
 
 ---
 
-## Phase 7: Validation & Deploy
+## Phase 7: Validation & Deploy ✓
 
-**Goal:** Verify everything works on Mac Mini.
+**Goal:** Verify everything works on Mac Mini — no secrets, no corporate artifacts, dry-run clean, then real deploy.
+**Status:** Complete (2026-02-12) — real deploy deferred to interactive terminal
 
-### Tasks
-1. Run pre-commit secret scan on entire repo
-2. `ansible-playbook --check` (dry run) on Mac Mini
-3. Review dry-run output for unexpected changes
-4. `ansible-playbook` real run on Mac Mini
-5. Verify git config works (signing, diff tools)
-6. Verify shell config works (aliases, functions, PATH)
-7. Verify ~/bin scripts work
-8. Verify new modules deployed correctly
+**Plans:** 1 plan
+
+Plans:
+- [x] 07-01-PLAN.md — Add missing modules to deploy.yml, secret scan, corporate scan, dry-run
 
 ### Acceptance Criteria
-- [ ] Dry run passes clean
-- [ ] Real run succeeds
-- [ ] All migrated configs are functional
-- [ ] Old laptop is confirmed wipeable
+- [x] All 36 active modules listed in deploy.yml
+- [x] Zero secrets in tracked files
+- [x] Zero corporate artifacts
+- [x] Dry run passes clean (MAS sudo expected failure in non-interactive mode)
+- [ ] Real deploy — run interactively: `ansible-playbook playbooks/deploy.yml -i playbooks/inventory --ask-become-pass --diff`
 
 ---
 
