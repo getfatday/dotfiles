@@ -87,14 +87,15 @@ Plans:
 
 ---
 
-## Phase 5: New Modules
+## Phase 5: New Modules ✓
 
 **Goal:** Add modules for tools found during audit but missing from repo. Scoped to what's available on current machine (old laptop volume disconnected).
+**Status:** Complete (2026-02-12)
 
 **Plans:** 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md — Create rust module + add gh config to git module
+- [x] 05-01-PLAN.md — Create rust module + add gh config to git module
 
 ### Scope
 1. **Rust module** — Create `modules/rust/` with config.yml (rustup-init) and .zshenv (cargo PATH)
@@ -103,9 +104,9 @@ Plans:
 4. **SSH module** — SKIP (audit confirmed: no config existed, 1Password handles SSH agent)
 
 ### Acceptance Criteria
-- [ ] Rust module follows existing pattern (config.yml + files/.zshenv)
-- [ ] gh config deployed via git module stow (no hosts.yml / auth tokens)
-- [ ] No secrets in any module files
+- [x] Rust module follows existing pattern (config.yml + files/.zshenv)
+- [x] gh config deployed via git module stow (no hosts.yml / auth tokens)
+- [x] No secrets in any module files
 
 ---
 
