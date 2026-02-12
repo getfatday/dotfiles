@@ -18,6 +18,7 @@ stow_dirs:
 # Files that should be merged with other modules
 mergeable_files:
   - ".zshrc"
+  - ".zshenv"
   - ".zpreztorc"
 
 # Note: This module provides:
