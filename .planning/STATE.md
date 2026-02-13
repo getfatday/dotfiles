@@ -40,7 +40,7 @@ Progress: ██████████ 100% (7/7 phases complete)
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Fix stow conflicts by adding --no-folding to ansible-role-dotmodules | 2026-02-12 | 6817fc2 | [1-fix-stow-conflicts-by-adding-no-folding-](./quick/1-fix-stow-conflicts-by-adding-no-folding-/) |
-| 2 | Pre-create shared parent dirs before stow to prevent ownership conflicts | 2026-02-12 | 6b84cfb (role), docs commit pending | [2-fix-stow-directory-ownership-conflicts-i](./quick/2-fix-stow-directory-ownership-conflicts-i/) |
+| 2 | Pre-create shared parent dirs before stow to prevent ownership conflicts | 2026-02-13 | 9884720 | [2-fix-stow-directory-ownership-conflicts-i](./quick/2-fix-stow-directory-ownership-conflicts-i/) |
 
 ## Session Continuity
 
