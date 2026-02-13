@@ -5,7 +5,7 @@
 - **Phase:** 7/7 (Validation & Deploy)
 - **Plan:** 1 of 1 complete
 - **Status:** All phases complete — real deploy deferred to interactive terminal
-- **Last activity:** 2026-02-13 — Added --override='.*' to stow command for foreign directory conflicts (quick task 4)
+- **Last activity:** 2026-02-13 — Replaced stow with direct symlink creation (quick task 5)
 
 Progress: ██████████ 100% (7/7 phases complete)
 
@@ -42,11 +42,12 @@ Progress: ██████████ 100% (7/7 phases complete)
 | 2 | Pre-create shared parent dirs before stow to prevent ownership conflicts | 2026-02-13 | 9884720 | [2-fix-stow-directory-ownership-conflicts-i](./quick/2-fix-stow-directory-ownership-conflicts-i/) |
 | 3 | Fix bin/zsh leaf directory conflict for .local/bin | 2026-02-13 | 722bfe2 | [3-fix-bin-zsh-leaf-directory-conflict-for-](./quick/3-fix-bin-zsh-leaf-directory-conflict-for-/) |
 | 4 | Add --override='.*' to stow for foreign directory conflicts | 2026-02-13 | 34daf5d | [4-fix-stow-foreign-directory-conflict-by-a](./quick/4-fix-stow-foreign-directory-conflict-by-a/) |
+| 5 | Replace stow with direct symlink creation via ansible.builtin.file | 2026-02-13 | c8019c5 | [5-fix-stow-foreign-directory-conflict-repl](./quick/5-fix-stow-foreign-directory-conflict-repl/) |
 
 ## Session Continuity
 
 - **Last session:** 2026-02-13
-- **Stopped at:** Quick task 4 complete — Added --override='.*' for foreign directory conflicts
-- **Resume file:** All phases complete; all stow conflict mechanisms in place
+- **Stopped at:** Quick task 5 complete — Replaced stow with direct symlink creation
+- **Resume file:** All phases complete; stow completely removed from deployment
 - **Remaining:**
-  - Run `ansible-playbook playbooks/deploy.yml -i playbooks/inventory --ask-become-pass --diff` interactively
+  - Run `ansible-playbook playbooks/deploy.yml -i playbooks/inventory --ask-become-pass --diff` interactively for MAS apps
