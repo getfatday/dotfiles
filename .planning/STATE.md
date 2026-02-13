@@ -5,7 +5,7 @@
 - **Phase:** 7/7 (Validation & Deploy)
 - **Plan:** 1 of 1 complete
 - **Status:** All phases complete — real deploy deferred to interactive terminal
-- **Last activity:** 2026-02-12 — Fixed stow --no-folding conflict in ansible-role-dotmodules (quick task 1)
+- **Last activity:** 2026-02-12 — Pre-created shared parent directories before stow (quick task 2)
 
 Progress: ██████████ 100% (7/7 phases complete)
 
@@ -25,6 +25,7 @@ Progress: ██████████ 100% (7/7 phases complete)
 | 05 | Exclude hosts.yml from git module | Contains OAuth tokens from gh auth login |
 | 07 | Defer real deploy to interactive terminal | MAS apps require sudo password via --ask-become-pass |
 | quick-1 | Disabled SSH signing for ansible-role-dotmodules commits | Same placeholder SSH key issue as dotfiles repo |
+| quick-2 | Pre-create shared parent directories before stow | Prevents ownership conflicts when multiple modules stow into same parent (.config, .local) |
 
 ## Blockers/Concerns Carried Forward
 
@@ -32,15 +33,20 @@ Progress: ██████████ 100% (7/7 phases complete)
 
 **Old Laptop Volume:** Disconnected. Phase 4 Plan 02 and any future tasks requiring /Volumes/Macintosh HD-1/ are blocked.
 
+**bin/zsh leaf directory conflict:** Both bin and zsh modules want to own `.local/bin`. The zsh module (mergeable) already stowed it as a symlinked directory. When bin module tries to stow, it conflicts. Requires architectural decision: make bin mergeable, restructure modules, or use alternative approach.
+
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Fix stow conflicts by adding --no-folding to ansible-role-dotmodules | 2026-02-12 | 6817fc2 | [1-fix-stow-conflicts-by-adding-no-folding-](./quick/1-fix-stow-conflicts-by-adding-no-folding-/) |
+| 2 | Pre-create shared parent dirs before stow to prevent ownership conflicts | 2026-02-12 | 6b84cfb (role), docs commit pending | [2-fix-stow-directory-ownership-conflicts-i](./quick/2-fix-stow-directory-ownership-conflicts-i/) |
 
 ## Session Continuity
 
 - **Last session:** 2026-02-12
-- **Stopped at:** Quick task 1 complete — Fixed stow --no-folding in ansible-role-dotmodules upstream repo
+- **Stopped at:** Quick task 2 complete — Pre-created shared parent directories before stow
 - **Resume file:** All phases complete; ready for interactive deploy
-- **Remaining:** Run `ansible-playbook playbooks/deploy.yml -i playbooks/inventory --ask-become-pass --diff` interactively
+- **Remaining:**
+  - Run `ansible-playbook playbooks/deploy.yml -i playbooks/inventory --ask-become-pass --diff` interactively
+  - Resolve bin/zsh leaf directory conflict (.local/bin owned by both modules)
