@@ -56,3 +56,16 @@
         homebrew_check_for_updates: false
         homebrew_upgrade_all_packages: false
         homebrew_clear_cache: false
+
+  # Install MAS apps directly without become to avoid eIT sudo block.
+  # Module configs use appstore_apps (not mas_installed_apps) so the
+  # geerlingguy.mac.mas role is skipped. The dotmodules role still
+  # collects and promotes appstore_apps as a host fact.
+  post_tasks:
+    - name: Install Mac App Store apps (without become)
+      community.general.mas:
+        id: "{{ item }}"
+        state: present
+      environment:
+        PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts.env.PATH }}"
+      loop: "{{ appstore_apps | default([]) }}"

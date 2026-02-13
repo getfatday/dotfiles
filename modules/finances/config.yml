@@ -3,7 +3,9 @@
 # Personal finance and budgeting applications
 
 # Copilot: Track & Budget Money from Mac App Store
-mas_installed_apps:
+# Uses appstore_apps (not mas_installed_apps) to avoid geerlingguy.mac.mas role
+# which uses become:true that gets blocked by eIT security
+appstore_apps:
   - 1447330651   # Copilot: Track & Budget Money
 
 # Stow directories for finance configs

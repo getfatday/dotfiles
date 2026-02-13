@@ -15,7 +15,9 @@ homebrew_casks:
   - obsidian
 
 # Mac App Store apps for Obsidian ecosystem
-mas_installed_apps:
+# Uses appstore_apps (not mas_installed_apps) to avoid geerlingguy.mac.mas role
+# which uses become:true that gets blocked by eIT security
+appstore_apps:
   - 6720708363  # Obsidian Web Clipper
 
 # Stow directories for Obsidian configs

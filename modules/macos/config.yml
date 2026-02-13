@@ -9,7 +9,9 @@ homebrew_packages:
   - things.sh     # Things 3 CLI interface
 
 # Common Mac App Store applications
-mas_installed_apps:
+# Uses appstore_apps (not mas_installed_apps) to avoid geerlingguy.mac.mas role
+# which uses become:true that gets blocked by eIT security
+appstore_apps:
   - 1451685025  # WireGuard
 
 # Stow directories for system configs
