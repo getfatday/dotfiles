@@ -49,6 +49,9 @@
     - role: ansible-role-dotmodules
       vars:
         mas_path: "/usr/local/bin/mas"
+        # Skip geerlingguy.mac.mas role (uses become:true blocked by eIT).
+        # MAS apps are installed in post_tasks without privilege escalation.
+        dotmodules_skip_mas_role: true
         # Additional workarounds for geerlingguy.mac collection
         homebrew_install_path: "/opt/homebrew"
         homebrew_user: "{{ ansible_user_id }}"
@@ -58,9 +61,9 @@
         homebrew_clear_cache: false
 
   # Install MAS apps directly without become to avoid eIT sudo block.
-  # Module configs use appstore_apps (not mas_installed_apps) so the
-  # geerlingguy.mac.mas role is skipped. The dotmodules role still
-  # collects and promotes appstore_apps as a host fact.
+  # The dotmodules role aggregates mas_installed_apps from module configs
+  # and promotes it as a host fact, but we skip the geerlingguy.mac.mas
+  # role (dotmodules_skip_mas_role: true) and install here instead.
   post_tasks:
     - name: Install Mac App Store apps (without become)
       community.general.mas:
@@ -68,4 +71,4 @@
         state: present
       environment:
         PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts.env.PATH }}"
-      loop: "{{ appstore_apps | default([]) }}"
+      loop: "{{ mas_installed_apps | default([]) }}"
