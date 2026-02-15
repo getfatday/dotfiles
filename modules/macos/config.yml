@@ -3,6 +3,9 @@
 # Based on legacy .osx analysis
 
 # System configuration tools
+homebrew_taps:
+  - AlexanderWillner/tap  # Required for things.sh formula
+
 homebrew_packages:
   - ical-buddy    # Calendar CLI (reads macOS Calendar)
   - mas           # Mac App Store CLI
