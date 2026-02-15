@@ -1,0 +1,17 @@
+---
+# dotm — Universal dotfiles module manager
+# Self-referential module: dotm manages itself
+
+homebrew_packages:
+  - uv
+
+stow_dirs:
+  - dotm
+
+# Note: This module provides:
+# - dotm CLI tool for managing dotfiles modules
+# - Drift detection (brew/cask/MAS packages not in any module)
+# - Module creation, installation, and verification
+# - Automated sync via launchd agent
+# - Claude Code slash commands (/dotm:status, /dotm:install, etc.)
+# - Security scanning for secrets before commits

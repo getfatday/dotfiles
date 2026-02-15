@@ -1,0 +1,23 @@
+[project]
+name = "dotm"
+version = "0.1.0"
+description = "Universal dotfiles module manager"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.0",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+dotm = "dotm.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
