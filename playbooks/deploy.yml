@@ -2,50 +2,40 @@
 # Main deployment playbook for dotfiles
 - name: Deploy dotfiles using ansible-role-dotmodules
   hosts: localhost
+  vars_files:
+    - profiles.yml
   vars:
     dotmodules:
       repo: "file://{{ playbook_dir }}/../modules"
       dest: "{{ ansible_env.HOME }}/.dotmodules"
-      install:
-        - 1password
-        - alfred
-        - bartender
-        - bin
-        - chatgpt
-        - chrome
-        - claude
-        - cursor
-        - database
-        - docker
-        - dotm
-        - dropbox
-        - editor
-        - finances
-        - firefox
-        - flux
-        - git
-        - go
-        - grammarly
-        - handbrake
-        - iterm
-        - karabiner
-        - licecap
-        - macos
-        - media
-        - ngrok
-        - node
-        - obsidian
-        - productivity
-        - rust
-        - security
-        - sequel-ace
-        - speckit
-        - spotify
-        - tmux
-        - vscode
-        - zsh
+      install: "{{ final_modules }}"
     # Configure MAS path for x86_64 Macs
     mas_path: "/usr/local/bin/mas"
+
+  pre_tasks:
+    - name: Resolve profile from hostname
+      ansible.builtin.set_fact:
+        detected_profile: "{{ hostname_to_profile[ansible_hostname] | default('unknown') }}"
+
+    - name: Compute final module list
+      ansible.builtin.set_fact:
+        final_modules: >-
+          {{
+            (base_modules + (profiles[detected_profile].include | default([])))
+            | difference(profiles[detected_profile].exclude | default([]))
+            | unique | sort
+          }}
+      when: detected_profile != 'unknown'
+
+    - name: Use base modules for unknown hostname
+      ansible.builtin.set_fact:
+        final_modules: "{{ base_modules | unique | sort }}"
+      when: detected_profile == 'unknown'
+
+    - name: Show deployment plan
+      ansible.builtin.debug:
+        msg: "Profile: {{ detected_profile }} | Modules ({{ final_modules | length }}): {{ final_modules | join(', ') }}"
+
   roles:
     - role: ansible-role-dotmodules
       vars:

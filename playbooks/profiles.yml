@@ -1,0 +1,56 @@
+---
+# Hostname-to-profile mapping
+hostname_to_profile:
+  Ians-Mac-mini: personal
+  EXPM06FFV7T17: work
+
+# Base modules installed on ALL systems
+base_modules:
+  - 1password
+  - alfred
+  - bartender
+  - bin
+  - chatgpt
+  - chrome
+  - claude
+  - cursor
+  - database
+  - docker
+  - dotm
+  - dropbox
+  - editor
+  - finances
+  - firefox
+  - flux
+  - git
+  - go
+  - grammarly
+  - handbrake
+  - iterm
+  - karabiner
+  - licecap
+  - macos
+  - media
+  - ngrok
+  - node
+  - obsidian
+  - productivity
+  - rust
+  - security
+  - sequel-ace
+  - speckit
+  - spotify
+  - tmux
+  - vscode
+  - zsh
+
+# Per-profile overrides
+profiles:
+  personal:
+    include:
+      - openclaw
+    exclude: []
+  work:
+    include: []
+    exclude:
+      - openclaw
