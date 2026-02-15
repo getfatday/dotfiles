@@ -7,7 +7,12 @@ homebrew_packages:
   - tmux                          # Terminal multiplexer
   - reattach-to-user-namespace    # macOS clipboard fix for tmux
 
+# Stow tmux config files to ~/
+stow_dirs:
+  - tmux
+
 # Note: This module provides:
 # - tmux terminal multiplexer for session management
 # - macOS clipboard integration via reattach-to-user-namespace
+# - Dracula-themed status bar and pane borders
 # - Enables persistent terminal sessions across SSH disconnects

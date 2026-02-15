@@ -118,9 +118,9 @@ def run_push(message: str | None = None, dry_run: bool = False) -> bool:
         console.print("[dim]Nothing to commit.[/dim]")
         return True
 
-    # Stage module files
+    # Stage module files and repo infrastructure
     subprocess.run(
-        ["git", "add", "modules/"],
+        ["git", "add", "modules/", "playbooks/", "CLAUDE.md"],
         capture_output=True, text=True, cwd=repo_path,
     )
 

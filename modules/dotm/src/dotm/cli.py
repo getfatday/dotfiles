@@ -12,11 +12,14 @@ from dotm.config import ensure_config, exclude_module, include_module, get_dotfi
 console = Console()
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0")
-def main():
+@click.pass_context
+def main(ctx):
     """dotm — Universal dotfiles module manager."""
     ensure_config()
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(plan)
 
 
 # --- list ---
@@ -296,3 +299,33 @@ def bootstrap(host, user):
     else:
         console.print(f"[red]Bootstrap failed.[/red]")
         sys.exit(1)
+
+
+# --- plan ---
+
+
+@main.command()
+@click.argument("prompt", nargs=-1)
+def plan(prompt):
+    """Open Claude Code in the dotfiles repo for interactive planning."""
+    import shutil
+    import subprocess
+
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        console.print("[red]Claude Code CLI not found.[/red]")
+        console.print("Install it: npm install -g @anthropic-ai/claude-code")
+        sys.exit(1)
+
+    repo_path = get_dotfiles_repo()
+    if not repo_path.exists():
+        console.print(f"[red]Dotfiles repo not found at {repo_path}[/red]")
+        sys.exit(1)
+
+    cmd = [claude_bin]
+    if prompt:
+        cmd.extend(["-p", " ".join(prompt)])
+
+    console.print(f"[dim]Launching Claude Code in {repo_path}...[/dim]")
+    result = subprocess.run(cmd, cwd=repo_path)
+    sys.exit(result.returncode)

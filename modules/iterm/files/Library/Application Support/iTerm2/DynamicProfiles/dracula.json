@@ -1,0 +1,152 @@
+{
+  "Profiles": [
+    {
+      "Name": "Dracula",
+      "Guid": "2363C0DF-DRAC-4B1D-AA6C-2E57A0A08C42",
+      "Background Color": {
+        "Red Component": 0.1569,
+        "Green Component": 0.1647,
+        "Blue Component": 0.2118,
+        "Color Space": "sRGB"
+      },
+      "Foreground Color": {
+        "Red Component": 0.9725,
+        "Green Component": 0.9725,
+        "Blue Component": 0.9490,
+        "Color Space": "sRGB"
+      },
+      "Cursor Color": {
+        "Red Component": 0.9725,
+        "Green Component": 0.9725,
+        "Blue Component": 0.9490,
+        "Color Space": "sRGB"
+      },
+      "Cursor Text Color": {
+        "Red Component": 0.1569,
+        "Green Component": 0.1647,
+        "Blue Component": 0.2118,
+        "Color Space": "sRGB"
+      },
+      "Selection Color": {
+        "Red Component": 0.2667,
+        "Green Component": 0.2784,
+        "Blue Component": 0.3529,
+        "Color Space": "sRGB"
+      },
+      "Selected Text Color": {
+        "Red Component": 0.9725,
+        "Green Component": 0.9725,
+        "Blue Component": 0.9490,
+        "Color Space": "sRGB"
+      },
+      "Bold Color": {
+        "Red Component": 0.9725,
+        "Green Component": 0.9725,
+        "Blue Component": 0.9490,
+        "Color Space": "sRGB"
+      },
+      "Link Color": {
+        "Red Component": 0.5451,
+        "Green Component": 0.9137,
+        "Blue Component": 0.9922,
+        "Color Space": "sRGB"
+      },
+      "Ansi 0 Color": {
+        "Red Component": 0.0,
+        "Green Component": 0.0,
+        "Blue Component": 0.0,
+        "Color Space": "sRGB"
+      },
+      "Ansi 1 Color": {
+        "Red Component": 1.0,
+        "Green Component": 0.3333,
+        "Blue Component": 0.3333,
+        "Color Space": "sRGB"
+      },
+      "Ansi 2 Color": {
+        "Red Component": 0.3137,
+        "Green Component": 0.9804,
+        "Blue Component": 0.4824,
+        "Color Space": "sRGB"
+      },
+      "Ansi 3 Color": {
+        "Red Component": 0.9451,
+        "Green Component": 0.9804,
+        "Blue Component": 0.5490,
+        "Color Space": "sRGB"
+      },
+      "Ansi 4 Color": {
+        "Red Component": 0.7412,
+        "Green Component": 0.5765,
+        "Blue Component": 0.9765,
+        "Color Space": "sRGB"
+      },
+      "Ansi 5 Color": {
+        "Red Component": 1.0,
+        "Green Component": 0.4745,
+        "Blue Component": 0.7765,
+        "Color Space": "sRGB"
+      },
+      "Ansi 6 Color": {
+        "Red Component": 0.5451,
+        "Green Component": 0.9137,
+        "Blue Component": 0.9922,
+        "Color Space": "sRGB"
+      },
+      "Ansi 7 Color": {
+        "Red Component": 0.7333,
+        "Green Component": 0.7333,
+        "Blue Component": 0.7333,
+        "Color Space": "sRGB"
+      },
+      "Ansi 8 Color": {
+        "Red Component": 0.3333,
+        "Green Component": 0.3333,
+        "Blue Component": 0.3333,
+        "Color Space": "sRGB"
+      },
+      "Ansi 9 Color": {
+        "Red Component": 1.0,
+        "Green Component": 0.3333,
+        "Blue Component": 0.3333,
+        "Color Space": "sRGB"
+      },
+      "Ansi 10 Color": {
+        "Red Component": 0.3137,
+        "Green Component": 0.9804,
+        "Blue Component": 0.4824,
+        "Color Space": "sRGB"
+      },
+      "Ansi 11 Color": {
+        "Red Component": 0.9451,
+        "Green Component": 0.9804,
+        "Blue Component": 0.5490,
+        "Color Space": "sRGB"
+      },
+      "Ansi 12 Color": {
+        "Red Component": 0.7412,
+        "Green Component": 0.5765,
+        "Blue Component": 0.9765,
+        "Color Space": "sRGB"
+      },
+      "Ansi 13 Color": {
+        "Red Component": 1.0,
+        "Green Component": 0.4745,
+        "Blue Component": 0.7765,
+        "Color Space": "sRGB"
+      },
+      "Ansi 14 Color": {
+        "Red Component": 0.5451,
+        "Green Component": 0.9137,
+        "Blue Component": 0.9922,
+        "Color Space": "sRGB"
+      },
+      "Ansi 15 Color": {
+        "Red Component": 1.0,
+        "Green Component": 1.0,
+        "Blue Component": 1.0,
+        "Color Space": "sRGB"
+      }
+    }
+  ]
+}
