@@ -1,10 +1,10 @@
 [user]
   name = Ian Anderson
-  # TODO: Set your personal email (must match GitHub account for commit attribution)
-  email = ianderson@example.com
-  # TODO: Set your SSH signing key from 1Password (public key, ssh-ed25519 format)
-  # See: https://developer.1password.com/docs/ssh/git-commit-signing/
-  signingkey = <configure via 1Password>
+  email = getfatday@gmail.com
+  signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHQCDl9wUFLPF1cvH4+PAXir0HcGu/ZtZmIkq9o1zky2
+
+[includeIf "hasconfig:remote.*.url:*github.com:eg-internal/**"]
+  path = ~/.config/git/config-work
 
 [core]
   editor = vi
