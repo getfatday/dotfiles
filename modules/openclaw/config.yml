@@ -1,3 +1,5 @@
 ---
 # OpenClaw — AI assistant infrastructure (personal systems only)
-# Placeholder module; packages and configs will be added as needed.
+
+stow_dirs:
+  - openclaw
