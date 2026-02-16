@@ -41,11 +41,13 @@
   roles:
     - role: ansible-role-dotmodules
       vars:
-        dotmodules:
-          repo: "file://{{ playbook_dir }}/../modules"
-          dest: "{{ ansible_facts.env.HOME }}/.dotmodules"
-          install: "{{ final_modules }}"
+        dotmodules_repo: "file://{{ playbook_dir }}/../modules"
+        dotmodules_dest: "{{ ansible_facts.env.HOME }}/.dotmodules"
+        dotmodules_install: "{{ final_modules }}"
         mas_path: "/usr/local/bin/mas"
+        # Skip geerlingguy.mac.mas role (uses become:true blocked by eIT).
+        # MAS apps are installed in post_tasks without privilege escalation.
+        dotmodules_skip_mas_role: true
         # Additional workarounds for geerlingguy.mac collection
         homebrew_install_path: "/opt/homebrew"
         homebrew_user: "{{ ansible_user_id }}"
