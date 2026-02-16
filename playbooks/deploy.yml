@@ -17,7 +17,7 @@
 
     - name: Resolve profile from hostname
       ansible.builtin.set_fact:
-        detected_profile: "{{ hostname_to_profile[ansible_hostname] | default('unknown') }}"
+        detected_profile: "{{ hostname_to_profile[ansible_facts.hostname] | default('unknown') }}"
 
     - name: Compute final module list
       ansible.builtin.set_fact:
@@ -38,16 +38,12 @@
       ansible.builtin.debug:
         msg: "Profile: {{ detected_profile }} | Modules ({{ final_modules | length }}): {{ final_modules | join(', ') }}"
 
-    - name: Configure dotmodules
-      ansible.builtin.set_fact:
-        dotmodules:
-          repo: "file://{{ playbook_dir }}/../modules"
-          dest: "{{ ansible_env.HOME }}/.dotmodules"
-          install: "{{ final_modules }}"
-
   roles:
     - role: ansible-role-dotmodules
       vars:
+        dotmodules_repo: "file://{{ playbook_dir }}/../modules"
+        dotmodules_dest: "{{ ansible_facts.env.HOME }}/.dotmodules"
+        dotmodules_install: "{{ final_modules }}"
         mas_path: "/usr/local/bin/mas"
         # Skip geerlingguy.mac.mas role (uses become:true blocked by eIT).
         # MAS apps are installed in post_tasks without privilege escalation.
