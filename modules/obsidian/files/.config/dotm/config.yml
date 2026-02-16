@@ -1,5 +1,0 @@
-dotfiles_repo: ~/src/dotfiles
-excluded_modules: []
-sync:
-  interval_minutes: 30
-  auto_apply: true

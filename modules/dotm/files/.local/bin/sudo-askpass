@@ -1,9 +1,9 @@
 #!/bin/bash
 # sudo-askpass — Targeted SUDO_ASKPASS helper for dotm launchd sync
 #
-# Only provides password when sudo is running /usr/sbin/installer
-# (e.g., Homebrew cask installs that ship .pkg files).
-# Reads the password from macOS Keychain.
+# Provides the user's password when sudo is running an allowed command.
+# Allowed: Homebrew cask installs (pkg, app copies, permission changes).
+# Reads the password from macOS Keychain; prompts via osascript on first use.
 #
 # Setup: security add-generic-password -s "dotm-sudo" -a "$(whoami)" -w
 
@@ -13,17 +13,36 @@ KEYCHAIN_ACCOUNT="$(whoami)"
 # Check what command sudo is trying to run
 SUDO_CMD=$(ps -o args= -p "$PPID" 2>/dev/null)
 
-if [[ "$SUDO_CMD" != *"/usr/sbin/installer"* ]]; then
-    echo "sudo-askpass: denied — not an installer invocation" >&2
+# Allowlist: commands that Homebrew cask legitimately runs via sudo
+allowed=false
+case "$SUDO_CMD" in
+    *"/usr/sbin/installer"*)        allowed=true ;;  # pkg installs
+    *"/bin/cp "*"/Applications/"*)   allowed=true ;;  # app bundle copies
+    *"/bin/chmod "*"/Applications/"*)allowed=true ;;  # fix permissions
+    *"/bin/mkdir "*"/Applications/"*)allowed=true ;;  # create app dirs
+    *"/bin/rm "*"/Applications/"*)   allowed=true ;;  # remove old app
+    *"/usr/sbin/chown "*"/Applications/"*) allowed=true ;;  # fix ownership
+esac
+
+if [ "$allowed" = false ]; then
+    echo "sudo-askpass: denied — command not in allowlist: $SUDO_CMD" >&2
     exit 1
 fi
+
+echo "sudo-askpass: allowed — $SUDO_CMD" >&2
 
 # Read password from macOS Keychain
 PASSWORD=$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null)
 
 if [[ -z "$PASSWORD" ]]; then
-    echo "sudo-askpass: no password found in Keychain (service=$KEYCHAIN_SERVICE)" >&2
-    exit 1
+    # Prompt via osascript dialog and store for future use
+    PASSWORD=$(osascript -e 'display dialog "dotm needs your password for sudo:" default answer "" with hidden answer buttons {"OK"} default button "OK" with title "dotm sudo"' -e 'text returned of result' 2>/dev/null)
+    if [[ -z "$PASSWORD" ]]; then
+        echo "sudo-askpass: no password provided" >&2
+        exit 1
+    fi
+    security add-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w "$PASSWORD" -U 2>/dev/null
+    echo "sudo-askpass: stored password in Keychain (service=$KEYCHAIN_SERVICE)" >&2
 fi
 
 echo "$PASSWORD"
