@@ -7,9 +7,12 @@ homebrew_packages:
   - zsh
   - zsh-history-substring-search
 
-# Prezto framework dependencies
-# Note: Prezto is installed via setup-prezto.sh script
-# Run ~/.local/bin/setup-prezto.sh after deployment
+# Prezto framework — cloned automatically during install
+git_repositories:
+  - repo: "https://github.com/sorin-ionescu/prezto.git"
+    dest: "~/.zprezto"
+    version: "master"
+    recursive: true
 
 # Stow directories for zsh configs
 stow_dirs:
@@ -20,12 +23,3 @@ mergeable_files:
   - ".zshrc"
   - ".zshenv"
   - ".zpreztorc"
-
-# Note: This module provides:
-# - Zsh shell with Prezto framework
-# - Prezto setup script (run ~/.local/bin/setup-prezto.sh)
-# - Pre-configured Prezto modules (git, syntax-highlighting, etc.)
-# - History substring search plugin
-# - Custom zsh configuration
-# - Input configuration (.inputrc)
-# - Comprehensive documentation
