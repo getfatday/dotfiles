@@ -1,1 +1,0 @@
-/Users/ianderson/.dotmodules/cursor/files/.config/cursor/README.md
