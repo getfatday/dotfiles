@@ -1,0 +1,29 @@
+#!/bin/bash
+# sudo-askpass — Targeted SUDO_ASKPASS helper for dotm launchd sync
+#
+# Only provides password when sudo is running /usr/sbin/installer
+# (e.g., Homebrew cask installs that ship .pkg files).
+# Reads the password from macOS Keychain.
+#
+# Setup: security add-generic-password -s "dotm-sudo" -a "$(whoami)" -w
+
+KEYCHAIN_SERVICE="dotm-sudo"
+KEYCHAIN_ACCOUNT="$(whoami)"
+
+# Check what command sudo is trying to run
+SUDO_CMD=$(ps -o args= -p "$PPID" 2>/dev/null)
+
+if [[ "$SUDO_CMD" != *"/usr/sbin/installer"* ]]; then
+    echo "sudo-askpass: denied — not an installer invocation" >&2
+    exit 1
+fi
+
+# Read password from macOS Keychain
+PASSWORD=$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null)
+
+if [[ -z "$PASSWORD" ]]; then
+    echo "sudo-askpass: no password found in Keychain (service=$KEYCHAIN_SERVICE)" >&2
+    exit 1
+fi
+
+echo "$PASSWORD"
