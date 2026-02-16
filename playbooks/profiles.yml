@@ -57,3 +57,4 @@ profiles:
     include: []
     exclude:
       - openclaw
+      - tailscale
