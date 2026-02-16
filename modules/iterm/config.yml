@@ -10,6 +10,14 @@ homebrew_casks:
 stow_dirs:
   - iterm
 
+# Set Dracula as the default iTerm2 profile
+# (Dynamic profile is loaded from ~/Library/Application Support/iTerm2/DynamicProfiles/)
+macos_defaults:
+  - domain: com.googlecode.iterm2
+    key: Default Bookmark Guid
+    type: string
+    value: "2363C0DF-DRAC-4B1D-AA6C-2E57A0A08C42"
+
 # Note: This module provides:
 # - iTerm2 terminal emulator
 # - Custom profiles and themes
