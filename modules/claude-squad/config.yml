@@ -1,0 +1,12 @@
+---
+# Claude Squad module
+# Manages multiple Claude Code instances in tmux sessions with git worktrees
+
+homebrew_packages:
+  - claude-squad
+
+stow_dirs:
+  - claude-squad
+
+mergeable_files:
+  - ".zshrc"

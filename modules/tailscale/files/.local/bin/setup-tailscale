@@ -1,0 +1,15 @@
+#!/bin/bash
+# One-time Tailscale setup with SSH enabled
+set -e
+
+HOSTNAME="$(hostname -s | tr '[:upper:]' '[:lower:]')"
+
+echo "Starting Tailscale with SSH enabled..."
+sudo tailscale up --ssh --hostname "$HOSTNAME"
+echo ""
+echo "Tailscale configured. Remote access:"
+echo "  ssh $HOSTNAME                        # From any Tailscale device"
+echo "  cc-remote $HOSTNAME list             # List tmux sessions"
+echo "  cc-remote $HOSTNAME attach <session> # Attach to session"
+echo ""
+tailscale status

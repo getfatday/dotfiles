@@ -13,6 +13,7 @@ base_modules:
   - chatgpt
   - chrome
   - claude
+  - claude-squad
   - cursor
   - database
   - discord
@@ -41,6 +42,7 @@ base_modules:
   - sequel-ace
   - speckit
   - spotify
+  - tailscale
   - tmux
   - vscode
   - zsh

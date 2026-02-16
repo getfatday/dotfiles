@@ -1,0 +1,19 @@
+#!/bin/bash
+# Enable Claude Code Agent Teams (experimental)
+set -e
+
+SETTINGS="$HOME/.claude/settings.json"
+if [ ! -f "$SETTINGS" ]; then
+  mkdir -p "$(dirname "$SETTINGS")"
+  echo '{}' > "$SETTINGS"
+fi
+
+# Merge the env setting using jq
+jq '.env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"' "$SETTINGS" > "$SETTINGS.tmp" \
+  && mv "$SETTINGS.tmp" "$SETTINGS"
+
+echo "Agent Teams enabled in $SETTINGS"
+echo "Restart Claude Code for changes to take effect."
+echo ""
+echo "Usage: In any Claude Code session, ask Claude to spawn teammates."
+echo "If inside tmux, teammates will appear as split panes automatically."

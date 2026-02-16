@@ -1,0 +1,16 @@
+#!/bin/bash
+# Usage: cc-remote <host> [list|attach <session>|cs-args...]
+# Attach to Claude Squad sessions on a remote Tailscale host
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: cc-remote <host> [list|attach <session>|cs-args...]"
+  exit 1
+fi
+
+HOST="$1"; shift
+case "${1:-list}" in
+  list)    ssh "$HOST" "tmux ls 2>/dev/null" ;;
+  attach)  ssh -t "$HOST" "tmux attach -t $2" ;;
+  *)       ssh -t "$HOST" "claude-squad $*" ;;
+esac
