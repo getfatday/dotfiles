@@ -1,0 +1,12 @@
+---
+# Discord module
+# Discord communication platform
+
+homebrew_casks:
+  - discord
+
+# Note: This module provides:
+# - Discord communication application
+# - Cross-platform compatibility (ARM64/x86_64)
+# - Automated installation via Ansible
+# - No configuration files (app-only module)

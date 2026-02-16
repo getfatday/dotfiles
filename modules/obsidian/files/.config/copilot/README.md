@@ -1,0 +1,1 @@
+/Users/ianderson/.dotmodules/finances/files/.config/copilot/README.md

@@ -15,6 +15,7 @@ base_modules:
   - claude
   - cursor
   - database
+  - discord
   - docker
   - dotm
   - dropbox
