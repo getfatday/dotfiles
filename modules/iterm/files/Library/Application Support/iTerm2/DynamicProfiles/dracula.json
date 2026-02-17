@@ -146,7 +146,9 @@
         "Green Component": 1.0,
         "Blue Component": 1.0,
         "Color Space": "sRGB"
-      }
+      },
+      "Custom Command": "Yes",
+      "Command": "tmux -CC new -A -s main"
     }
   ]
 }
