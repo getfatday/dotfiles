@@ -148,7 +148,7 @@
         "Color Space": "sRGB"
       },
       "Custom Command": "Yes",
-      "Command": "/opt/homebrew/bin/tmux -CC new -A -s main"
+      "Command": "/bin/zsh -lc 'exec tmux -CC new -A -s main'"
     }
   ]
 }
