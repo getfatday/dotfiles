@@ -30,7 +30,7 @@ base_modules:
   - grammarly
   - handbrake
   - iterm
-  - karabiner
+  - keyboard
   - licecap
   - macos
   - media

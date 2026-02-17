@@ -1,0 +1,6 @@
+---
+# Native macOS keyboard remapping via hidutil
+# Swaps Caps Lock <-> Control (no third-party software needed)
+
+stow_dirs:
+  - keyboard
