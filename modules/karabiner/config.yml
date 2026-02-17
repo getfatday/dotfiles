@@ -6,5 +6,6 @@
 homebrew_casks:
   - karabiner-elements
 
-# Note: This module provides:
-# - Karabiner Elements keyboard customization utility (key remapping, complex modifications)
+# Stow config directory to ~/.config/karabiner/
+stow_dirs:
+  - karabiner
