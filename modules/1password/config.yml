@@ -4,6 +4,7 @@
 
 homebrew_casks:
   - 1password
+  - 1password-cli                 # `op` CLI for secret references and env injection
 
 stow_dirs:
   - 1password
