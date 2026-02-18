@@ -4,7 +4,6 @@
 
 # Productivity dependencies
 homebrew_packages:
-  - autojump
   - dos2unix      # Line ending conversion
   - fzf
   - gnu-sed       # GNU sed (macOS sed is BSD, limited)
@@ -14,7 +13,6 @@ homebrew_packages:
   - rsync         # File sync (newer than macOS built-in)
   - stow          # GNU Stow (used by dotfiles system)
   - wget          # HTTP fetcher
-  - z
 
 # Stow directories for productivity configs
 stow_dirs:
@@ -25,8 +23,5 @@ mergeable_files:
   - ".zshrc"      # Productivity aliases and functions
 
 # Note: This module provides:
-# - Auto jump configuration
-# - Z directory navigation
 # - Fuzzy finding with fzf
 # - Productivity aliases and functions
-# - Navigation utilities

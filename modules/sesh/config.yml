@@ -3,8 +3,12 @@
 # Provides fuzzy session switching, directory-based sessions via zoxide
 
 homebrew_packages:
+  - gum                   # TUI components (alternative sesh picker)
   - sesh                  # Tmux session manager
-  - zoxide                # Directory tracker (used by sesh for session discovery)
+  - zoxide                # Smart cd replacement (replaces z and autojump)
 
 stow_dirs:
   - sesh
+
+mergeable_files:
+  - ".zshrc"

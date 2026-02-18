@@ -1,5 +1,11 @@
 # sesh configuration
-# See: https://github.com/joshmedeski/sesh
+# https://github.com/joshmedeski/sesh
 
-[default_session]
-startup_command = ""
+# Sessions to hide from listings
+blacklist = ["scratch"]
+
+# Show 2-level directory names (e.g. "projects/sesh" not just "sesh")
+dir_length = 2
+
+# Display order: tmux first, configured, then zoxide
+sort_order = ["config", "tmux", "zoxide"]
