@@ -43,7 +43,6 @@ base_modules:
   - sequel-ace
   - speckit
   - spotify
-  - tailscale
   - tmux
   - vscode
   - zsh
@@ -58,4 +57,3 @@ profiles:
     include: []
     exclude:
       - openclaw
-      - tailscale

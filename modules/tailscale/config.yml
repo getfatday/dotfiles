@@ -1,9 +1,0 @@
----
-# Tailscale module
-# Mesh VPN with SSH access for remote session management
-
-homebrew_casks:
-  - tailscale
-
-stow_dirs:
-  - tailscale
