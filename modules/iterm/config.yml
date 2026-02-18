@@ -17,6 +17,11 @@ macos_defaults:
     key: Default Bookmark Guid
     type: string
     value: "2363C0DF-DRAC-4B1D-AA6C-2E57A0A08C42"
+  # Bury the tmux -CC client window automatically after connecting
+  - domain: com.googlecode.iterm2
+    key: AutoHideTmuxClientSession
+    type: bool
+    value: true
 
 # Note: This module provides:
 # - iTerm2 terminal emulator
