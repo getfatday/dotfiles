@@ -1,0 +1,5 @@
+# sesh configuration
+# See: https://github.com/joshmedeski/sesh
+
+[default_session]
+startup_command = ""

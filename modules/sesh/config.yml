@@ -1,0 +1,10 @@
+---
+# sesh — smart tmux session manager
+# Provides fuzzy session switching, directory-based sessions via zoxide
+
+homebrew_packages:
+  - sesh                  # Tmux session manager
+  - zoxide                # Directory tracker (used by sesh for session discovery)
+
+stow_dirs:
+  - sesh

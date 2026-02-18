@@ -47,12 +47,13 @@ def ansible_apply(repo_path, excluded: list[str], quiet: bool = False) -> bool:
 
     # Build the install list as extra vars
     install_json = "[" + ", ".join(f'"{m}"' for m in effective) + "]"
-    extra_vars = f'{{"dotmodules": {{"install": {install_json}}}}}'
+    extra_vars = f'{{"final_modules": {install_json}}}'
 
+    inventory = repo_path / "playbooks" / "inventory"
     cmd = [
         "ansible-playbook", str(deploy_yml),
+        "-i", str(inventory),
         "--extra-vars", extra_vars,
-        "--connection", "local",
     ]
 
     if quiet:

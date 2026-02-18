@@ -43,18 +43,15 @@ def list_all_modules() -> list[dict]:
 
 
 def get_deploy_modules() -> list[str]:
-    """Read the install list from deploy.yml."""
-    deploy_yml = get_dotfiles_repo() / "playbooks" / "deploy.yml"
-    if not deploy_yml.exists():
+    """Read the base_modules list from profiles.yml."""
+    profiles_yml = get_dotfiles_repo() / "playbooks" / "profiles.yml"
+    if not profiles_yml.exists():
         return []
-    with open(deploy_yml) as f:
+    with open(profiles_yml) as f:
         data = yaml.safe_load(f)
-    if not data or not isinstance(data, list):
+    if not data or not isinstance(data, dict):
         return []
-    for play in data:
-        dotmodules = play.get("vars", {}).get("dotmodules", {})
-        return dotmodules.get("install", [])
-    return []
+    return data.get("base_modules", [])
 
 
 def is_module_installed(name: str) -> bool:
@@ -63,67 +60,77 @@ def is_module_installed(name: str) -> bool:
 
 
 def add_to_deploy(name: str) -> None:
-    """Add a module to the deploy.yml install list."""
-    deploy_yml = get_dotfiles_repo() / "playbooks" / "deploy.yml"
-    with open(deploy_yml) as f:
-        content = f.read()
-    with open(deploy_yml) as f:
+    """Add a module to the base_modules list in profiles.yml."""
+    profiles_yml = get_dotfiles_repo() / "playbooks" / "profiles.yml"
+    with open(profiles_yml) as f:
         data = yaml.safe_load(f)
 
-    install_list = data[0]["vars"]["dotmodules"]["install"]
-    if name in install_list:
+    base_modules = data.get("base_modules", [])
+    if name in base_modules:
         return
 
     # Insert alphabetically
-    install_list.append(name)
-    install_list.sort()
+    base_modules.append(name)
+    base_modules.sort()
+    data["base_modules"] = base_modules
 
     # Rewrite the file preserving structure
-    with open(deploy_yml) as f:
+    with open(profiles_yml) as f:
         lines = f.readlines()
 
-    # Find the install: block and reconstruct it
+    # Find the base_modules: block and reconstruct it
     new_lines = []
-    in_install_block = False
-    install_indent = ""
+    in_base_block = False
+    base_indent = ""
     for line in lines:
         stripped = line.lstrip()
-        if stripped.startswith("install:"):
-            in_install_block = True
-            install_indent = line[: len(line) - len(stripped)]
+        if stripped.startswith("base_modules:"):
+            in_base_block = True
+            base_indent = line[: len(line) - len(stripped)]
             new_lines.append(line)
-            for mod in install_list:
-                new_lines.append(f"{install_indent}  - {mod}\n")
+            for mod in base_modules:
+                new_lines.append(f"{base_indent}  - {mod}\n")
             continue
-        if in_install_block:
+        if in_base_block:
             if stripped.startswith("- ") and not stripped.startswith("- name:"):
                 continue  # Skip old entries
             else:
-                in_install_block = False
+                in_base_block = False
                 new_lines.append(line)
         else:
             new_lines.append(line)
 
-    with open(deploy_yml, "w") as f:
+    with open(profiles_yml, "w") as f:
         f.writelines(new_lines)
 
 
 def remove_from_deploy(name: str) -> None:
-    """Remove a module from the deploy.yml install list."""
-    deploy_yml = get_dotfiles_repo() / "playbooks" / "deploy.yml"
-    with open(deploy_yml) as f:
+    """Remove a module from the base_modules list in profiles.yml."""
+    profiles_yml = get_dotfiles_repo() / "playbooks" / "profiles.yml"
+    with open(profiles_yml) as f:
         lines = f.readlines()
 
+    # Only remove entries within the base_modules block
     new_lines = []
+    in_base_block = False
     for line in lines:
-        stripped = line.strip()
-        if stripped == f"- {name}" and not stripped.startswith("- name:"):
-            # Check context — only skip if we're in the install block
-            # Simple heuristic: these are indented module entries
+        stripped = line.lstrip()
+        if stripped.startswith("base_modules:"):
+            in_base_block = True
+            new_lines.append(line)
             continue
-        new_lines.append(line)
+        if in_base_block:
+            if stripped.startswith("- "):
+                if stripped.strip() == f"- {name}":
+                    continue  # Skip this entry
+                new_lines.append(line)
+            else:
+                in_base_block = False
+                new_lines.append(line)
+        else:
+            new_lines.append(line)
 
-    with open(deploy_yml, "w") as f:
+    with open(profiles_yml, "w") as f:
         f.writelines(new_lines)
 
 
@@ -183,11 +190,12 @@ def run_ansible_for_module(name: str) -> subprocess.CompletedProcess:
     repo = get_dotfiles_repo()
     deploy_yml = repo / "playbooks" / "deploy.yml"
 
+    inventory = repo / "playbooks" / "inventory"
     return subprocess.run(
         [
             "ansible-playbook", str(deploy_yml),
-            "--extra-vars", f'{{"dotmodules": {{"install": ["{name}"]}}}}',
-            "--connection", "local",
+            "-i", str(inventory),
+            "--extra-vars", f'{{"final_modules": ["{name}"]}}',
         ],
         capture_output=True,
         text=True,

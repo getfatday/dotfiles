@@ -21,8 +21,8 @@ base_modules:
   - dotm
   - dropbox
   - editor
-  - finances
   - figma
+  - finances
   - firefox
   - flux
   - git
@@ -41,6 +41,7 @@ base_modules:
   - rust
   - security
   - sequel-ace
+  - sesh
   - speckit
   - spotify
   - tmux
