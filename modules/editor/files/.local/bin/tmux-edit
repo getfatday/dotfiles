@@ -1,0 +1,37 @@
+#!/bin/bash
+# tmux-edit: fzf file picker that opens emacsclient in a dedicated tmux pane
+#
+# Called from tmux keybinding (prefix + e) via display-popup.
+# Uses the tmux client's active pane as the split target.
+
+# Select file with fzf
+file=$(find . -type f -not -path '*/.*' \
+  | fzf --preview 'bat --color=always {} 2>/dev/null || cat {}')
+[ -z "$file" ] && exit 0
+
+file="$(realpath "$file")"
+
+# Get the active pane/window of the underlying client (not the popup)
+orig_pane=$(tmux display-message -p '#{client_last_session}' 2>/dev/null)
+if [ -z "$orig_pane" ]; then
+  # Fallback: get active pane of current session
+  orig_pane=$(tmux list-panes -F '#{pane_id}:#{pane_active}' \
+    | grep ':1$' | head -1 | cut -d: -f1)
+fi
+
+# Find the active window's panes and look for an editor pane
+editor_pane=$(tmux list-panes -F '#{pane_id}:#{pane_title}' \
+  | grep ':editor$' | head -1 | cut -d: -f1)
+
+if [ -n "$editor_pane" ]; then
+  # Reuse existing editor pane — tell emacs to open the file
+  emacsclient -e "(find-file \"$file\")" >/dev/null
+  tmux select-pane -t "$editor_pane"
+else
+  # Create new editor pane on the left side of the active pane
+  active_pane=$(tmux list-panes -F '#{pane_id}:#{pane_active}' \
+    | grep ':1$' | head -1 | cut -d: -f1)
+  new_pane=$(tmux split-window -hb -t "$active_pane" -l 50% \
+    -P -F '#{pane_id}' "emacsclient -nw '$file'")
+  tmux select-pane -t "$new_pane" -T editor
+fi
