@@ -95,7 +95,8 @@
 ;; Rebind set-mark-command to M-Space
 (global-set-key (kbd "M-SPC") 'set-mark-command)
 
-;; Use Zenburns
+;; Dracula theme
+(prelude-require-package 'dracula-theme)
 (load-theme 'dracula t)
 
 ;; Visual Bell

@@ -8,6 +8,12 @@ homebrew_packages:
   - vim
   - neovim
 
+# Prelude framework — cloned automatically during install
+git_repositories:
+  - repo: "https://github.com/bbatsov/prelude.git"
+    dest: "~/.emacs.d"
+    version: "master"
+
 # Stow directories for editor configs
 stow_dirs:
   - editor
