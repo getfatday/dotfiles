@@ -13,9 +13,5 @@ alias dmk='function () { docker-machine kill ${1-default} }'
 alias db='docker build'
 alias dp='docker push'
 
-# Docker CLI completions
-# The following lines have been added by Docker Desktop to enable Docker CLI completions.
+# Docker CLI completions (compinit handled by Prezto completion module)
 fpath=(/Users/ianderson/.docker/completions $fpath)
-autoload -Uz compinit
-compinit
-# End of Docker CLI completions
