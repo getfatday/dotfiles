@@ -118,6 +118,9 @@
         "Green Component": 1.0,
         "Blue Component": 1.0
       },
+      "Normal Font": "JetBrainsMonoNFM-Regular 14",
+      "Non Ascii Font": "JetBrainsMonoNFM-Regular 14",
+      "Use Non-ASCII Font": false,
       "Custom Command": "Yes",
       "Command": "/bin/zsh -lc 'exec tmux new'"
     }

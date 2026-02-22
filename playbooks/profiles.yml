@@ -25,11 +25,13 @@ base_modules:
   - finances
   - firefox
   - flux
+  - fonts
   - git
   - go
   - grammarly
   - handbrake
   - iterm
+  - keepingyouawake
   - keyboard
   - licecap
   - macos

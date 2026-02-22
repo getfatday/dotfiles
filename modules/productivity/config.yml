@@ -13,6 +13,7 @@ homebrew_packages:
   - rsync         # File sync (newer than macOS built-in)
   - stow          # GNU Stow (used by dotfiles system)
   - wget          # HTTP fetcher
+  - fd            # Fast find alternative (used by sesh ctrl-f picker)
 
 # Stow directories for productivity configs
 stow_dirs:

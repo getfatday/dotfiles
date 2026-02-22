@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "macos-notify": {
+      "command": "npx",
+      "args": ["-y", "macos-notify-mcp"]
+    }
+  }
+}

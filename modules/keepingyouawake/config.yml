@@ -1,0 +1,6 @@
+---
+# KeepingYouAwake — menu bar caffeine toggle (coffee cup icon)
+# Prevents Mac from sleeping; wraps Apple's caffeinate command
+
+homebrew_casks:
+  - keepingyouawake
