@@ -17,7 +17,16 @@
  '(nrepl-message-colors
    '("#CC9393" "#DFAF8F" "#F0DFAF" "#7F9F7F" "#BFEBBF" "#93E0E3"
      "#94BFF3" "#DC8CC3"))
- '(package-selected-packages nil)
+ '(package-selected-packages
+   '(ace-window ag anzu browse-kill-ring company counsel crux diff-hl
+                diminish discover-my-major dracula-theme easy-kill
+                elisp-slime-nav epl exec-path-from-shell expand-region
+                gist git-modes git-timemachine guru-mode hl-todo
+                imenu-anywhere json-mode lsp-ui magit move-text nlinum
+                operate-on-number projectile rainbow-delimiters
+                rainbow-mode smartparens smartrep super-save tide
+                typescript-mode undo-tree volatile-highlights
+                yaml-mode zenburn-theme zop-to-char))
  '(pdf-view-midnight-colors '("#DCDCCC" . "#383838"))
  '(vc-annotate-background "#2B2B2B")
  '(vc-annotate-color-map

@@ -45,6 +45,12 @@ defaults write NSGlobalDomain PMPrintingExpandedStateForPrint -bool true
 # Save to disk (not to iCloud) by default
 defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
 
+# Check if iCloud Desktop & Documents sync is enabled
+if ! xattr -p com.apple.icloud.desktop ~/Desktop &>/dev/null; then
+  printf "\n⚠️  iCloud Desktop & Documents sync is NOT enabled.\n"
+  printf "   Enable it: System Settings → Apple ID → iCloud → iCloud Drive → Desktop & Documents Folders\n\n"
+fi
+
 # Automatically quit printer app once the print jobs complete
 defaults write com.apple.print.PrintingPrefs "Quit When Finished" -bool true
 
