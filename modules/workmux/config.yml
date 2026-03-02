@@ -1,0 +1,9 @@
+---
+# Workmux module
+# Git worktree + tmux orchestration for AI agent workflows
+
+homebrew_taps:
+  - raine/workmux
+
+homebrew_packages:
+  - workmux

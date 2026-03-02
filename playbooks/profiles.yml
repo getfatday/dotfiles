@@ -48,6 +48,7 @@ base_modules:
   - spotify
   - tmux
   - vscode
+  - workmux
   - zsh
 
 # Per-profile overrides
