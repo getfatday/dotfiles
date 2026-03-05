@@ -4,9 +4,6 @@
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)"
 export PATH="$HOME/.local/bin:$PATH"
 
-# Get project name from cwd
-project=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
-
 # Prompt for title
 title=$(gum input --placeholder "Worktree title..." --header "Claude Worktree")
 [[ -z "$title" ]] && exit 0
@@ -15,16 +12,6 @@ title=$(gum input --placeholder "Worktree title..." --header "Claude Worktree")
 slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
 [[ -z "$slug" ]] && exit 1
 
-session="${project}:${slug}"
-
-# Choose where to open
-target=$(gum choose "New session" "Current session")
-[[ -z "$target" ]] && exit 0
-
-if [[ "$target" == "New session" ]]; then
-  tmux new-session -d -s "$session" -c "$(pwd)" \
-    "claude --dangerously-skip-permissions --worktree $slug"
-  tmux switch-client -t "$session"
-else
-  claude --dangerously-skip-permissions --worktree "$slug"
-fi
+# Create worktree + tmux window via workmux, then launch claude inside the shell
+workmux add "$slug" --session --no-pane-cmds
+workmux run "$slug" --background -- claude --dangerously-skip-permissions

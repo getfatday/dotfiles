@@ -7,3 +7,6 @@ homebrew_taps:
 
 homebrew_packages:
   - workmux
+
+stow_dirs:
+  - workmux

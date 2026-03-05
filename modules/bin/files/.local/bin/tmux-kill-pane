@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Smart kill-pane: if in a workmux worktree, offer to remove it; otherwise kill pane.
+
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)"
+export PATH="$HOME/.local/bin:$PATH"
+
+pane_path="$1"
+
+# Detect workmux worktree by checking for __worktrees in the path
+if [[ "$pane_path" == *__worktrees/* ]]; then
+  # Extract worktree name (directory after __worktrees/)
+  wt_name=$(echo "$pane_path" | sed 's|.*__worktrees/||; s|/.*||')
+
+  # Use gum confirm, then workmux remove (no --force, lets workmux warn about uncommitted changes)
+  if gum confirm "Remove worktree '$wt_name'?"; then
+    workmux remove "$wt_name"
+  fi
+else
+  tmux kill-pane
+fi
