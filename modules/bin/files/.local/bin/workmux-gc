@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# workmux-gc — garbage-collect stale worktrees, branches, and git admin
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)"
+export PATH="$HOME/.local/bin:$PATH"
+
+dry_run=false
+notify=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=true ;;
+    --notify)  notify=true ;;
+  esac
+done
+
+# 1. Fetch + prune deleted remote branches
+git fetch --prune --quiet 2>/dev/null
+
+# 2. Remove worktrees whose upstream branch was deleted (PR merged/closed)
+if $dry_run; then
+  echo "=== Stale worktrees (upstream gone) ==="
+  workmux remove --gone --force 2>&1 | head -20
+else
+  removed=$(workmux remove --gone --force 2>&1)
+  echo "$removed"
+fi
+
+# 3. Prune orphaned .git/worktrees/ entries
+git worktree prune
+
+# 4. Clean orphaned local branches
+if $dry_run; then
+  echo "=== Orphaned branches ==="
+  git unused
+else
+  git unused -D
+fi
+
+# 5. Clean stale Claude session refs
+workmux claude prune 2>/dev/null
+
+# 6. Notify on macOS if requested
+if $notify && ! $dry_run; then
+  stale_count=$(git branch -vv 2>/dev/null | grep 'origin/.*: gone]' | wc -l | tr -d ' ')
+  if [[ "$stale_count" -gt 0 ]]; then
+    osascript -e "display notification \"$stale_count stale worktree(s) remaining\" with title \"workmux-gc\""
+  fi
+fi

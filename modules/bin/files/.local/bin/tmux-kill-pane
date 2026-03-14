@@ -14,6 +14,9 @@ if [[ "$pane_path" == *__worktrees/* ]]; then
   # Use gum confirm, then workmux remove (no --force, lets workmux warn about uncommitted changes)
   if gum confirm "Remove worktree '$wt_name'?"; then
     workmux remove "$wt_name"
+    # Nudge about other stale worktrees
+    stale=$(git branch -vv 2>/dev/null | grep 'origin/.*: gone]' | wc -l | tr -d ' ')
+    [[ "$stale" -gt 0 ]] && echo "$stale other stale branch(es). Run 'workmux-gc' to clean." && sleep 2
   fi
 else
   tmux kill-pane

@@ -12,6 +12,9 @@ title=$(gum input --placeholder "Worktree title..." --header "Claude Worktree")
 slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
 [[ -z "$slug" ]] && exit 1
 
+# Fetch latest main (timeout 5s so offline doesn't block)
+timeout 5 git fetch origin main --quiet 2>/dev/null
+
 # Create worktree + tmux window via workmux, then launch claude inside the shell
-workmux add "$slug" --session --no-pane-cmds
+workmux add "$slug" --base origin/main --session --no-pane-cmds
 workmux run "$slug" --background -- claude --dangerously-skip-permissions
