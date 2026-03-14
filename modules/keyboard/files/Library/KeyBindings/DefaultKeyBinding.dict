@@ -1,0 +1,10 @@
+{
+    "^a" = moveToBeginningOfLine:;
+    "^e" = moveToEndOfLine:;
+    "^b" = moveBackward:;
+    "^f" = moveForward:;
+    "^d" = deleteForward:;
+    "^p" = moveUp:;
+    "^n" = moveDown:;
+    "^k" = deleteToEndOfLine:;
+}
