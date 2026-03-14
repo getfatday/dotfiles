@@ -57,3 +57,4 @@ modules/merged/
 __pycache__/
 *.pyc
 .venv/
+.claude/worktrees/
