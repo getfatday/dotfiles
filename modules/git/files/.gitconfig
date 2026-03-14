@@ -74,3 +74,5 @@
 
 [web]
   browser = google-chrome
+[credential "https://github.expedia.biz"]
+	helper = \\!/opt/homebrew/bin/gh auth git-credential
