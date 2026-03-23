@@ -122,7 +122,7 @@
       "Non Ascii Font": "JetBrainsMonoNFM-Regular 14",
       "Use Non-ASCII Font": false,
       "Custom Command": "Yes",
-      "Command": "/bin/zsh -lc 'exec tmux new'"
+      "Command": "/bin/zsh -lc 'exec tmux new-session -A -s main'"
     }
   ]
 }

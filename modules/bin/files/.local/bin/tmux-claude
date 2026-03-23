@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
-
-# Ensure Homebrew and local bins are in PATH for tmux popups
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)"
 export PATH="$HOME/.local/bin:$PATH"
 
-# Prompt for title
-title=$(gum input --placeholder "Worktree title..." --header "Claude Worktree")
-[[ -z "$title" ]] && exit 0
+prompt=$(gum write --placeholder "Describe the task..." --header "Claude Worktree" --height 5)
+[[ -z "$prompt" ]] && exit 0
 
-# Slugify: lowercase, replace non-alphanumeric with hyphens, collapse, trim
-slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
-[[ -z "$slug" ]] && exit 1
-
-# Fetch latest main (timeout 5s so offline doesn't block)
-timeout 5 git fetch origin main --quiet 2>/dev/null
-
-# Create worktree + tmux window via workmux, then launch claude inside the shell
-workmux add "$slug" --base origin/main --session --no-pane-cmds
-workmux run "$slug" --background -- claude --dangerously-skip-permissions
+workmux add --auto-name --prompt "$prompt" --session

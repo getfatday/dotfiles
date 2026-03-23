@@ -1,5 +1,16 @@
 nerdfont: true
+status_format: false
+base_branch: origin/main
+merge_strategy: rebase
+
+auto_name:
+  background: true
+
+post_create:
+  - git fetch origin main --quiet 2>/dev/null || true
 
 panes:
-  - command: <agent>
+  - command: "claude --dangerously-skip-permissions"
     focus: true
+  - split: horizontal
+    size: 15
