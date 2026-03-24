@@ -1,0 +1,6 @@
+---
+# Google Workspace CLI (gws)
+# https://github.com/googleworkspace/cli
+
+homebrew_packages:
+  - googleworkspace-cli    # Google Workspace CLI
