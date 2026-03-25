@@ -29,6 +29,7 @@ base_modules:
   - git
   - go
   - grammarly
+  - gws
   - handbrake
   - iterm
   - keepingyouawake
