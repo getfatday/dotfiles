@@ -2,6 +2,7 @@
 # This file will be merged with the main .zshrc file
 
 # Git aliases and functions from legacy configuration
+unalias gws 2>/dev/null
 alias gw="git status --ignore-submodules=all --short"
 alias gdt="git difftool"
 alias gR="gf && gwR @{u}"
