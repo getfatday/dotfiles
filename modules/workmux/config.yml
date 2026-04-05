@@ -10,3 +10,6 @@ homebrew_packages:
 
 stow_dirs:
   - workmux
+
+mergeable_files:
+  - ".zshrc"

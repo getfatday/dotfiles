@@ -6,9 +6,6 @@ alias yolo='claude --dangerously-skip-permissions'
 
 # Workmux
 alias wm='workmux'
-if command -v workmux >/dev/null 2>&1; then
-  eval "$(workmux completions zsh)"
-fi
 
 # Claude Squad completions
 if command -v claude-squad >/dev/null 2>&1; then
