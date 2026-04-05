@@ -1,16 +1,25 @@
 nerdfont: true
-status_format: false
 base_branch: origin/main
 merge_strategy: rebase
+agent: claude
+theme: obsidian-pop
 
 auto_name:
   background: true
+
+sidebar:
+  width: 35
+  layout: tiles
+
+files:
+  symlink:
+    - .claude/settings.local.json
 
 post_create:
   - git fetch origin main --quiet 2>/dev/null || true
 
 panes:
-  - command: "claude --dangerously-skip-permissions"
+  - command: <agent>
     focus: true
   - split: horizontal
     size: 15

@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)"
-export PATH="$HOME/.local/bin:$PATH"
-
-prompt=$(gum write --placeholder "Describe the task..." --header "Claude Worktree" --height 5)
-[[ -z "$prompt" ]] && exit 0
-
-workmux add --auto-name --prompt "$prompt" --session
