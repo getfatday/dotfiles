@@ -23,5 +23,3 @@ post_create:
 panes:
   - command: <agent>
     focus: true
-  - split: horizontal
-    size: 15

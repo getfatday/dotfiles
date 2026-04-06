@@ -31,11 +31,11 @@
 [credential]
   helper = osxkeychain
 [credential "https://github.com"]
-  helper =
-  helper = !/opt/homebrew/bin/gh auth git-credential
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
 [credential "https://gist.github.com"]
-  helper =
-  helper = !/opt/homebrew/bin/gh auth git-credential
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
 
 [push]
   default = simple
@@ -75,4 +75,5 @@
 [web]
   browser = google-chrome
 [credential "https://github.expedia.biz"]
-	helper = \\!/opt/homebrew/bin/gh auth git-credential
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
