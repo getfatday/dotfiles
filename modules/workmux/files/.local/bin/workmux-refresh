@@ -122,7 +122,7 @@ for file in "$SESSION_DIR"/*.md; do
   log_action "refreshing $base"
   response=$(
     cd "$VAULT" 2>/dev/null && \
-    claude -p --model haiku \
+    claude -p --model haiku --dangerously-skip-permissions \
       "Use the workstream-summary-refresher subagent to refresh the session at path: $file. Respond with only the agent's one-line output (NOOP:, SKIP:, UPDATED:, or ERROR:)." \
       2>/dev/null || true
   )
