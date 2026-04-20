@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+# workmux-auto-close — close idle workmux sessions whose PR is resolved.
+#
+# Driven by the vault's Sessions/ list (global across repos), not by
+# `workmux list --json` (which is repo-scoped). For each session doc with
+# status active|paused this iterates:
+#
+#   1. Resolve the worktree path (from `path:` frontmatter, falling back to
+#      conventions: ~/.git-bare/<repo>__worktrees/<handle> or
+#      ~/src/<repo>__worktrees/<handle>).
+#   2. If the path is missing on disk, mark the session `abandoned` with
+#      exit-event `orphan` and move on. The pre_remove hook can't run
+#      without a worktree, so we write the minimal close fields directly.
+#   3. If the path exists, apply the five auto-close checks:
+#        - no uncommitted changes
+#        - workmux agent status != working
+#        - last HEAD commit older than IDLE_THRESHOLD_SECS (default 24h)
+#        - upstream exists and no unpushed commits
+#        - gh pr list on the branch returns state MERGED or CLOSED
+#      When all pass, run `workmux remove --force <handle>` from the
+#      worktree. The pre_remove hook handles session doc close, summary,
+#      and reflection.
+#
+# Flags: --dry-run, --verbose.
+# Env:
+#   IDLE_THRESHOLD_SECS   Override idle threshold (default 86400 = 24h).
+#   WORKMUX_AUTO_CLOSE_LOG  Log file (default ~/Library/Logs/workmux-auto-close.log).
+
+set -euo pipefail
+
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
+
+VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia"
+SESSION_DIR="$VAULT/Sessions"
+IDLE_THRESHOLD_SECS="${IDLE_THRESHOLD_SECS:-86400}"
+LOG_FILE="${WORKMUX_AUTO_CLOSE_LOG:-$HOME/Library/Logs/workmux-auto-close.log}"
+DRY_RUN=false
+VERBOSE=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --verbose|-v) VERBOSE=true ;;
+    --help|-h) sed -n '2,30p' "$0"; exit 0 ;;
+    *) echo "Unknown arg: $arg" >&2; exit 2 ;;
+  esac
+done
+
+mkdir -p "$(dirname "$LOG_FILE")"
+
+timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
+log_action() { printf '[%s] %s\n' "$(timestamp)" "$*" | tee -a "$LOG_FILE"; }
+log_debug() { $VERBOSE && printf '[%s]   %s\n' "$(timestamp)" "$*" >&2 || true; }
+
+for cmd in workmux gh jq git; do
+  command -v "$cmd" >/dev/null 2>&1 || { log_action "ERROR: $cmd not found in PATH"; exit 1; }
+done
+
+[ -d "$SESSION_DIR" ] || { log_action "ERROR: session dir missing: $SESSION_DIR"; exit 1; }
+
+# Read a top-level frontmatter scalar. Strips surrounding quotes, trims spaces.
+read_fm() {
+  local file="$1" key="$2"
+  awk -v key="$key" '
+    BEGIN { fm = 0 }
+    /^---$/ { fm++; if (fm == 2) exit; next }
+    fm == 1 {
+      if (match($0, "^" key ":[ ]*")) {
+        val = substr($0, RLENGTH + 1)
+        gsub(/^"|"$/, "", val)
+        print val
+        exit
+      }
+    }
+  ' "$file"
+}
+
+# Resolve a worktree path from frontmatter. Uses `path:` when present,
+# otherwise tries conventions against `repo:` and `handle:`.
+resolve_path() {
+  local file="$1"
+  local p
+  p=$(read_fm "$file" path)
+  if [ -n "$p" ]; then
+    printf '%s' "$p"
+    return
+  fi
+  local repo handle
+  repo=$(read_fm "$file" repo)
+  handle=$(read_fm "$file" handle)
+  [ -z "$repo" ] || [ -z "$handle" ] && return
+
+  local candidates=(
+    "$HOME/.git-bare/${repo}__worktrees/${handle}"
+    "$HOME/src/${repo}__worktrees/${handle}"
+    "$HOME/src/${repo}"  # single-repo mode: worktree at repo root
+  )
+  local c
+  for c in "${candidates[@]}"; do
+    if [ -d "$c" ]; then
+      printf '%s' "$c"
+      return
+    fi
+  done
+}
+
+# Mark a session doc as abandoned with exit-event orphan. Used when the
+# worktree is missing — the pre_remove hook can't run, so we update the
+# frontmatter minimally and let the session doc reflect reality.
+mark_orphan() {
+  local file="$1"
+  local today
+  today=$(date +%Y-%m-%d)
+
+  # Only transition if currently active|paused.
+  grep -qE '^status: (active|paused)$' "$file" || return 0
+
+  sed -i '' -E 's/^status: (active|paused)$/status: abandoned/' "$file"
+
+  if ! grep -q '^closed:' "$file"; then
+    sed -i '' "/^status: abandoned$/a\\
+closed: $today" "$file"
+  fi
+
+  if ! grep -q '^exit-event:' "$file"; then
+    sed -i '' "/^closed: $today$/a\\
+exit-event: orphan" "$file"
+  fi
+}
+
+now=$(date +%s)
+checked=0
+closed=0
+orphaned=0
+
+shopt -s nullglob
+for session_file in "$SESSION_DIR"/*.md; do
+  [ -f "$session_file" ] || continue
+
+  status=$(read_fm "$session_file" status)
+  case "$status" in
+    active|paused) ;;
+    *) continue ;;
+  esac
+
+  checked=$((checked + 1))
+  handle=$(read_fm "$session_file" handle)
+  repo=$(read_fm "$session_file" repo)
+  [ -z "$handle" ] && { log_debug "skip $(basename "$session_file"): no handle"; continue; }
+
+  path=$(resolve_path "$session_file")
+
+  if [ -z "$path" ] || [ ! -d "$path" ]; then
+    log_action "orphan $handle ($repo): worktree missing"
+    if ! $DRY_RUN; then
+      mark_orphan "$session_file"
+      orphaned=$((orphaned + 1))
+    fi
+    continue
+  fi
+
+  log_debug "check $handle (repo=$repo path=$path)"
+
+  # Uncommitted changes
+  if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
+    log_debug "  skip: uncommitted changes"
+    continue
+  fi
+
+  # Agent status (workmux status is repo-scoped; check in this repo's context)
+  # Resolve main repo root from the worktree path for this check.
+  main_repo=$(git -C "$path" rev-parse --git-common-dir 2>/dev/null | xargs -I{} dirname "{}" 2>/dev/null || echo "")
+  if [ -n "$main_repo" ] && [ -d "$main_repo" ]; then
+    statuses_json=$(cd "$main_repo" && workmux status --json 2>/dev/null || echo '[]')
+    agent_status=$(jq -r --arg h "$handle" '.[] | select(.worktree == $h) | .status' <<<"$statuses_json")
+    if [ "$agent_status" = "working" ]; then
+      log_debug "  skip: agent working"
+      continue
+    fi
+  fi
+
+  # Last commit age
+  last_commit_ts=$(git -C "$path" log -1 --format=%ct HEAD 2>/dev/null || echo 0)
+  if [ "$last_commit_ts" = "0" ]; then
+    log_debug "  skip: no commits on HEAD"
+    continue
+  fi
+  age_secs=$((now - last_commit_ts))
+  if [ "$age_secs" -lt "$IDLE_THRESHOLD_SECS" ]; then
+    log_debug "  skip: last commit $((age_secs / 3600))h ago (threshold $((IDLE_THRESHOLD_SECS / 3600))h)"
+    continue
+  fi
+
+  # Unpushed commits (upstream must exist)
+  if git -C "$path" rev-parse --verify --quiet '@{upstream}' >/dev/null 2>&1; then
+    unpushed=$(git -C "$path" rev-list --count '@{upstream}..HEAD' 2>/dev/null || echo -1)
+    if [ "$unpushed" != "0" ]; then
+      log_debug "  skip: $unpushed unpushed commit(s)"
+      continue
+    fi
+  else
+    log_debug "  skip: no upstream tracking (workmux-gc --gone handles these)"
+    continue
+  fi
+
+  # PR must be MERGED or CLOSED
+  branch=$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  [ -z "$branch" ] && { log_debug "  skip: no branch"; continue; }
+  pr_state=$(cd "$path" && gh pr list --head "$branch" --state all --limit 1 --json state --jq '.[0].state' 2>/dev/null || echo "")
+  if [ -z "$pr_state" ]; then
+    log_debug "  skip: no PR for branch"
+    continue
+  fi
+  if [ "$pr_state" != "MERGED" ] && [ "$pr_state" != "CLOSED" ]; then
+    log_debug "  skip: PR state is $pr_state"
+    continue
+  fi
+
+  reason="PR $pr_state, last commit $((age_secs / 3600))h ago"
+  if $DRY_RUN; then
+    log_action "DRY-RUN would close $handle ($reason)"
+  else
+    log_action "closing $handle ($reason)"
+    if (cd "$main_repo" && workmux remove --force "$handle") >>"$LOG_FILE" 2>&1; then
+      log_action "  closed $handle"
+      closed=$((closed + 1))
+    else
+      log_action "  FAILED to close $handle (see log)"
+    fi
+  fi
+done
+
+log_debug "checked $checked session(s); closed $closed; orphaned $orphaned"
+exit 0
