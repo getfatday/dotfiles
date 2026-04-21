@@ -21,6 +21,24 @@
 
 set -euo pipefail
 
+# Concurrency guard — only one instance at a time. macOS does not ship flock,
+# so use a PID file: if the recorded PID is still alive, exit; otherwise claim
+# the lock and clear it on exit.
+LOCK_FILE="$HOME/Library/Caches/workmux-refresh.lock"
+mkdir -p "$(dirname "$LOCK_FILE")"
+if [ -f "$LOCK_FILE" ]; then
+  existing_pid=$(cat "$LOCK_FILE" 2>/dev/null || true)
+  if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+    _early_log="${WORKMUX_REFRESH_LOG:-$HOME/Library/Logs/workmux-refresh.log}"
+    mkdir -p "$(dirname "$_early_log")"
+    printf '[%s] skip start: instance %s already running\n' \
+      "$(date '+%Y-%m-%d %H:%M:%S')" "$existing_pid" >> "$_early_log"
+    exit 0
+  fi
+fi
+echo $$ > "$LOCK_FILE"
+trap 'rm -f "$LOCK_FILE"' EXIT
+
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
 
 VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia"
@@ -80,7 +98,7 @@ considered=0
 refreshed=0
 skipped=0
 
-log_action "=== workmux-refresh start (stale >= ${STALE_THRESHOLD_SECS}s${DRY_RUN:+, DRY RUN}) ==="
+log_action "=== workmux-refresh start (stale >= ${STALE_THRESHOLD_SECS}s$($DRY_RUN && echo ', DRY RUN')) ==="
 
 shopt -s nullglob
 for file in "$SESSION_DIR"/*.md; do
