@@ -10,6 +10,7 @@ base_modules:
   - alfred
   - bartender
   - bin
+  - bun
   - chatgpt
   - chrome
   - claude

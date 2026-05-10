@@ -1,0 +1,9 @@
+---
+# Bun module
+# Fast all-in-one JavaScript runtime, bundler, transpiler, package manager, and test runner
+
+homebrew_taps:
+  - oven-sh/bun
+
+homebrew_packages:
+  - bun
