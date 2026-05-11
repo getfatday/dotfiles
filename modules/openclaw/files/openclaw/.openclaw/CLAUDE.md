@@ -11,7 +11,8 @@ OpenClaw is a multi-channel AI agent framework. This instance runs **Neo** — I
 ```
 ~/.openclaw/
   openclaw.json          # Main config (channels, plugins, auth, gateway) — DO NOT edit directly
-  workspace/             # Gateway agent workspace (prompt files for Neo)
+  workspace/             # Neo agent workspace (prompt files for Neo)
+  workspace-dispatcher/  # Dispatcher agent workspace (project channel triage)
     AGENTS.md            #   Operating rules & workflows (symlink to Obsidian)
     SOUL.md              #   Identity & principles (symlink)
     USER.md              #   Ian's context & preferences (symlink)
@@ -151,6 +152,75 @@ openclaw_config_patch('{"plugins":{"entries":{"imessage":{"enabled":true}}}}')
 
 Plugin code lives in `extensions/<plugin-name>/`. Config is inline in `openclaw.json` under `plugins.entries.<name>.config`.
 
+## Multi-Agent Routing
+
+OpenClaw supports multiple isolated agents sharing one gateway. Each agent has its own workspace, session store, and optionally its own model. Inbound messages are routed to agents via **bindings**.
+
+Docs: https://docs.openclaw.ai/concepts/multi-agent
+
+### Current Agents
+
+| Agent | Purpose | Workspace |
+|-------|---------|-----------|
+| `main` (default) | Neo — general conversations, DMs, Telegram | `~/.openclaw/workspace/` |
+| `dispatcher` | Project channel triage — forwards work requests to Claude Code sessions | `~/.openclaw/workspace-dispatcher/` |
+
+### Agent Structure
+
+Each agent gets:
+- **Workspace** — prompt files (`AGENTS.md`, `SOUL.md`, etc.) that define its personality/behavior
+- **Agent dir** — `~/.openclaw/agents/<id>/agent/` (auth profiles, per-agent config)
+- **Session store** — `~/.openclaw/agents/<id>/sessions/` (isolated conversation history)
+- **Model** (optional) — can override the default model per agent
+- **Tools profile** — `minimal` | `coding` | `messaging` | `full` (controls tool access)
+- **Subagent spawning** — `allowAgents: ["*"]` to spawn other agent types (default: same agent only)
+
+### Bindings
+
+Bindings route inbound messages to an agent by channel, peer, guild, etc. Precedence (most-specific wins):
+1. `peer` (exact channel/DM ID)
+2. `parentPeer` (thread inheritance)
+3. `guildId + roles`
+4. `guildId`
+5. `accountId`
+6. Channel-level
+7. Default agent fallback
+
+### CLI Commands
+
+```bash
+openclaw agents list --bindings     # Show agents and their routing rules
+openclaw agents add <name>          # Create a new agent (interactive)
+openclaw agents add <name> --workspace <dir> --non-interactive  # Non-interactive
+openclaw agents delete <name>       # Remove agent and prune state
+openclaw agents set-identity <name> # Update name/theme/emoji/avatar
+```
+
+### Config Example
+
+```json5
+{
+  "agents": {
+    "list": [
+      { "id": "main", "default": true, "workspace": "~/.openclaw/workspace" },
+      { "id": "dispatcher", "workspace": "~/.openclaw/workspace-dispatcher",
+        "model": "anthropic/claude-sonnet-4-5" }
+    ]
+  },
+  "bindings": [
+    { "agentId": "dispatcher", "match": { "channel": "discord", "peer": { "id": "CHANNEL_ID" } } }
+  ]
+}
+```
+
+### Recipe: Bind a Discord Channel to an Agent
+
+```
+openclaw config set 'bindings' '[{"agentId":"dispatcher","match":{"channel":"discord","peer":{"id":"CHANNEL_ID"}}}]' --json
+```
+
+Or via merge-patch if bindings already exist — read current bindings first, append, write back.
+
 ## Utility Scripts
 
 | Script | Purpose |
@@ -259,7 +329,8 @@ mkdir -p ~/.openclaw/workspace/skills/my-skill
 | What | Path |
 |------|------|
 | Config | `~/.openclaw/openclaw.json` |
-| Workspace | `~/.openclaw/workspace/` |
+| Workspace (Neo) | `~/.openclaw/workspace/` |
+| Workspace (Dispatcher) | `~/.openclaw/workspace-dispatcher/` |
 | Skills | `~/.openclaw/workspace/skills/` |
 | Extensions | `~/.openclaw/extensions/` |
 | Bin scripts | `~/.openclaw/bin/` |
