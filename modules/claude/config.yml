@@ -12,6 +12,7 @@ stow_dirs:
 
 mergeable_files:
   - ".zshrc"
+  - ".zshenv"    # Machine-local agent secrets source line
 
 # Note: This module provides:
 # - Claude desktop application for AI conversations
