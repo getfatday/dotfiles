@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 from rich.console import Console
 
@@ -13,22 +15,72 @@ from dotm.security import scan_changed_files, print_scan_results
 
 console = Console()
 
+# Fetch over HTTPS with a GIT_ASKPASS helper instead of the SSH origin: the
+# 1Password SSH agent authorizes per top-level client process, so every
+# launchd tick (a fresh `dotm sync`) either pops a Touch ID prompt or hangs
+# ~60s and fails. This never touches the `origin` remote, which stays on SSH
+# for interactive use.
+HTTPS_FETCH_URL = "https://github.com/getfatday/dotfiles.git"
+ASKPASS_HELPER = Path.home() / ".local" / "bin" / "dotm-git-askpass"
 
-def git_pull(repo_path, quiet: bool = False) -> bool:
-    """Pull latest changes from remote."""
+
+def _promptless_git_env() -> dict:
+    """Env for a git invocation that must never block on a credential prompt."""
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_ASKPASS"] = str(ASKPASS_HELPER)
+    return env
+
+
+def git_pull(repo_path, quiet: bool = False) -> tuple[bool, bool]:
+    """Fetch over HTTPS (promptless) and rebase onto the fetched branch.
+
+    Returns (success, updated) — `updated` is False when the repo was
+    already up to date, so callers can skip the ansible apply.
+    """
     if not quiet:
         console.print("[dim]Pulling latest changes...[/dim]")
-    result = subprocess.run(
-        ["git", "pull", "--rebase"],
+
+    before = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True, text=True, cwd=repo_path,
+    ).stdout.strip()
+    branch = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True, text=True, cwd=repo_path,
+    ).stdout.strip()
+
+    # Explicit refspec keeps origin/<branch> updated (like a normal `fetch
+    # origin`) even though we're fetching from the HTTPS URL directly.
+    fetch = subprocess.run(
+        ["git", "-c", "credential.helper=", "fetch", "--quiet",
+         HTTPS_FETCH_URL, f"+refs/heads/{branch}:refs/remotes/origin/{branch}"],
+        capture_output=True, text=True, cwd=repo_path, timeout=60,
+        env=_promptless_git_env(),
+    )
+    if fetch.returncode != 0:
+        if not quiet:
+            console.print(f"[red]Git fetch failed:[/red] {fetch.stderr.strip()}")
+        return False, False
+
+    rebase = subprocess.run(
+        ["git", "rebase", f"origin/{branch}"],
         capture_output=True, text=True, cwd=repo_path, timeout=60,
     )
-    if result.returncode != 0:
+    if rebase.returncode != 0:
         if not quiet:
-            console.print(f"[red]Git pull failed:[/red] {result.stderr.strip()}")
-        return False
-    if not quiet and result.stdout.strip() != "Already up to date.":
-        console.print(f"  {result.stdout.strip()}")
-    return True
+            console.print(f"[red]Git rebase failed:[/red] {rebase.stderr.strip()}")
+        return False, False
+
+    after = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True, text=True, cwd=repo_path,
+    ).stdout.strip()
+
+    updated = before != after
+    if not quiet and updated and rebase.stdout.strip():
+        console.print(f"  {rebase.stdout.strip()}")
+    return True, updated
 
 
 def ansible_apply(repo_path, excluded: list[str], quiet: bool = False) -> bool:
@@ -81,9 +133,14 @@ def run_sync(quiet: bool = False) -> bool:
             console.print(f"[red]Dotfiles repo not found at {repo_path}[/red]")
         return False
 
-    pull_ok = git_pull(repo_path, quiet=quiet)
+    pull_ok, updated = git_pull(repo_path, quiet=quiet)
     if not pull_ok:
         return False
+
+    if not updated:
+        if not quiet:
+            console.print("[dim]Already up to date — skipping apply.[/dim]")
+        return True
 
     apply_ok = ansible_apply(repo_path, excluded, quiet=quiet)
     if not quiet:

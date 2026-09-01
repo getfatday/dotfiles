@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# dotm-git-askpass — GIT_ASKPASS helper for headless dotm git operations.
+#
+# The 1Password SSH agent authorizes per top-level client process, so every
+# launchd tick (a fresh `dotm sync` process) either pops a Touch ID prompt or
+# hangs ~60s and fails with "agent refused operation". Fetching over HTTPS
+# with this helper instead reads a token from the gh keyring at call time —
+# silent in headless contexts, nothing written to argv or disk.
+case "$1" in
+    Username*) echo "getfatday" ;;
+    Password*) exec /opt/homebrew/bin/gh auth token --user getfatday ;;
+    *) exit 1 ;;
+esac

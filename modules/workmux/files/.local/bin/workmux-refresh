@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# workmux-refresh — periodically refresh workstream-summary/next-action on
+# active root sessions whose last-reflected timestamp has aged past the
+# stale threshold.
+#
+# Iterates the vault's Sessions/ list. For each session doc this:
+#
+#   1. Skips non-sessions, child sessions, and any status outside
+#      {active, paused}.
+#   2. Skips sessions whose last-reflected is newer than STALE_THRESHOLD_SECS
+#      (default 7200 = 2h).
+#   3. Invokes the `workstream-summary-refresher` subagent via `claude -p`
+#      from the vault root. The agent handles its own signal gathering
+#      (git log, Slack, Observations) and edits frontmatter in place. It is
+#      idempotent — no new activity means no write.
+#
+# Flags: --dry-run, --verbose.
+# Env:
+#   STALE_THRESHOLD_SECS       Override staleness (default 7200 = 2h).
+#   WORKMUX_REFRESH_LOG        Log file (default ~/Library/Logs/workmux-refresh.log).
+
+set -euo pipefail
+
+# Concurrency guard — only one instance at a time. macOS does not ship flock,
+# so use a PID file: if the recorded PID is still alive, exit; otherwise claim
+# the lock and clear it on exit.
+LOCK_FILE="$HOME/Library/Caches/workmux-refresh.lock"
+mkdir -p "$(dirname "$LOCK_FILE")"
+if [ -f "$LOCK_FILE" ]; then
+  existing_pid=$(cat "$LOCK_FILE" 2>/dev/null || true)
+  if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+    _early_log="${WORKMUX_REFRESH_LOG:-$HOME/Library/Logs/workmux-refresh.log}"
+    mkdir -p "$(dirname "$_early_log")"
+    printf '[%s] skip start: instance %s already running\n' \
+      "$(date '+%Y-%m-%d %H:%M:%S')" "$existing_pid" >> "$_early_log"
+    exit 0
+  fi
+fi
+echo $$ > "$LOCK_FILE"
+trap 'rm -f "$LOCK_FILE"' EXIT
+
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
+
+VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia"
+SESSION_DIR="$VAULT/Sessions"
+STALE_THRESHOLD_SECS="${STALE_THRESHOLD_SECS:-7200}"
+LOG_FILE="${WORKMUX_REFRESH_LOG:-$HOME/Library/Logs/workmux-refresh.log}"
+DRY_RUN=false
+VERBOSE=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --verbose|-v) VERBOSE=true ;;
+    --help|-h) sed -n '2,24p' "$0"; exit 0 ;;
+    *) echo "Unknown arg: $arg" >&2; exit 2 ;;
+  esac
+done
+
+mkdir -p "$(dirname "$LOG_FILE")"
+
+timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
+log_action() { printf '[%s] %s\n' "$(timestamp)" "$*" | tee -a "$LOG_FILE"; }
+log_debug() { $VERBOSE && printf '[%s]   %s\n' "$(timestamp)" "$*" >&2 || true; }
+
+command -v claude >/dev/null 2>&1 || { log_action "ERROR: claude not found in PATH"; exit 1; }
+[ -d "$SESSION_DIR" ] || { log_action "ERROR: session dir missing: $SESSION_DIR"; exit 1; }
+
+# Read a top-level frontmatter scalar. Strips surrounding quotes.
+read_fm() {
+  local file="$1" key="$2"
+  awk -v key="$key" '
+    BEGIN { fm = 0 }
+    /^---$/ { fm++; if (fm == 2) exit; next }
+    fm == 1 {
+      if (match($0, "^" key ":[ ]*")) {
+        val = substr($0, RLENGTH + 1)
+        gsub(/^"|"$/, "", val)
+        print val
+        exit
+      }
+    }
+  ' "$file"
+}
+
+# Convert an ISO-8601 or YYYY-MM-DD value to epoch seconds. Empty on failure.
+to_epoch() {
+  local v="$1"
+  [ -z "$v" ] && return
+  # Try full ISO first
+  date -j -f '%Y-%m-%dT%H:%M:%S' "$v" +%s 2>/dev/null && return
+  # Date-only
+  date -j -f '%Y-%m-%d' "$v" +%s 2>/dev/null && return
+}
+
+now=$(date +%s)
+considered=0
+refreshed=0
+skipped=0
+
+log_action "=== workmux-refresh start (stale >= ${STALE_THRESHOLD_SECS}s$($DRY_RUN && echo ', DRY RUN')) ==="
+
+shopt -s nullglob
+for file in "$SESSION_DIR"/*.md; do
+  base=$(basename "$file")
+  [ "$base" = "index.md" ] && continue
+
+  type_v=$(read_fm "$file" type)
+  [ "$type_v" = "session" ] || { log_debug "skip $base: type=$type_v"; continue; }
+
+  parent=$(read_fm "$file" parent-session)
+  [ -n "$parent" ] && { log_debug "skip $base: child session"; continue; }
+
+  status_v=$(read_fm "$file" status)
+  case "$status_v" in
+    active|paused) ;;
+    *) log_debug "skip $base: status=$status_v"; continue ;;
+  esac
+
+  last_reflected=$(read_fm "$file" last-reflected)
+  if [ -n "$last_reflected" ]; then
+    lr_epoch=$(to_epoch "$last_reflected")
+    if [ -n "$lr_epoch" ]; then
+      age=$(( now - lr_epoch ))
+      if [ "$age" -lt "$STALE_THRESHOLD_SECS" ]; then
+        log_debug "skip $base: reflected ${age}s ago (< ${STALE_THRESHOLD_SECS}s)"
+        skipped=$((skipped + 1))
+        continue
+      fi
+    fi
+  fi
+
+  considered=$((considered + 1))
+
+  if $DRY_RUN; then
+    log_action "WOULD refresh $base"
+    continue
+  fi
+
+  log_action "refreshing $base"
+  response=$(
+    cd "$VAULT" 2>/dev/null && \
+    claude -p --model haiku --dangerously-skip-permissions \
+      "Use the workstream-summary-refresher subagent to refresh the session at path: $file. Respond with only the agent's one-line output (NOOP:, SKIP:, UPDATED:, or ERROR:)." \
+      2>/dev/null || true
+  )
+  response=$(printf '%s' "$response" | head -1)
+  log_action "  -> ${response:-(empty)}"
+  case "$response" in
+    UPDATED:*) refreshed=$((refreshed + 1)) ;;
+  esac
+done
+
+log_action "=== done: considered=$considered refreshed=$refreshed already-fresh=$skipped ==="

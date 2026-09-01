@@ -13,7 +13,20 @@ for arg in "$@"; do
 done
 
 # 1. Fetch + prune deleted remote branches
-git fetch --prune --quiet 2>/dev/null
+# Promptless: the 1Password SSH agent authorizes per top-level client
+# process, so a fresh launchd tick either pops a Touch ID prompt or hangs
+# and fails with "agent refused operation". Fetch over HTTPS with the same
+# askpass helper dotm uses (reads a token from the gh keyring, silent in
+# headless contexts) instead of touching the SSH origin remote. Falls back
+# to a fast-failing SSH fetch if the helper isn't installed.
+if [[ -x "$HOME/.local/bin/dotm-git-askpass" ]]; then
+  GIT_TERMINAL_PROMPT=0 GIT_ASKPASS="$HOME/.local/bin/dotm-git-askpass" \
+    git -c credential.helper= fetch --prune --quiet \
+    https://github.com/getfatday/dotfiles.git '+refs/heads/*:refs/remotes/origin/*' 2>/dev/null
+else
+  GIT_SSH_COMMAND='ssh -oBatchMode=yes -oConnectTimeout=10' \
+    git fetch --prune --quiet 2>/dev/null
+fi
 
 # 2. Remove worktrees whose upstream branch was deleted (PR merged/closed)
 if $dry_run; then
