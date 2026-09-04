@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# wg-station — bootstrap and manage the apartment LAN WireGuard tunnel
+# ("station-wg" on a UDR7) using a per-host client config stored in 1Password.
+# The .conf never lives in this repo; it is fetched at runtime with `op`.
+set -euo pipefail
+
+CONF_DIR="$HOME/.config/wireguard"
+CONF_FILE="$CONF_DIR/station-wg.conf"
+ENDPOINT="and5-apt.duckdns.org:51820"
+
+usage() {
+  cat <<'EOF'
+usage: wg-station <command>
+
+commands:
+  install   fetch this host's client config from 1Password
+  up        bring the tunnel up (installs first if missing)
+  down      bring the tunnel down
+  status    show tunnel status
+  check     show public IP and whether the LAN gateway answers
+EOF
+}
+
+require_op() {
+  if ! command -v op >/dev/null 2>&1; then
+    echo "op (1Password CLI) not found on PATH." >&2
+    exit 1
+  fi
+  if ! op whoami >/dev/null 2>&1; then
+    echo "run: op signin" >&2
+    exit 1
+  fi
+}
+
+host_name() {
+  local host
+  host="$(scutil --get LocalHostName 2>/dev/null || true)"
+  if [[ -z "$host" ]]; then
+    host="$(hostname -s)"
+  fi
+  printf '%s' "$host" | tr '[:upper:]' '[:lower:]'
+}
+
+cmd_install() {
+  require_op
+
+  local host title
+  host="$(host_name)"
+  title="WireGuard station-wg ${host} (UDR7 client conf)"
+
+  mkdir -p "$CONF_DIR"
+  chmod 700 "$CONF_DIR"
+
+  if op document get "$title" --out-file "$CONF_FILE" >/dev/null 2>&1; then
+    chmod 600 "$CONF_FILE"
+    echo "Installed WireGuard client config for host '${host}'."
+    return 0
+  fi
+
+  cat <<EOF
+No WireGuard client document for host '${host}' in 1Password. Create a client named ${host}
+on the UDR7 (VPN Server > station-wg > Add Client), download the .conf BEFORE clicking
+Create, set Endpoint = ${ENDPOINT}, then: op document create <file> --title
+'${title}' --tags wireguard,udr7
+EOF
+  exit 0
+}
+
+cmd_up() {
+  if [[ ! -f "$CONF_FILE" ]]; then
+    cmd_install
+  fi
+  if [[ ! -f "$CONF_FILE" ]]; then
+    echo "No config installed; nothing to bring up." >&2
+    exit 1
+  fi
+  sudo wg-quick up "$CONF_FILE"
+}
+
+cmd_down() {
+  sudo wg-quick down "$CONF_FILE"
+}
+
+cmd_status() {
+  if sudo wg show >/dev/null 2>&1 && [[ -n "$(sudo wg show 2>/dev/null)" ]]; then
+    sudo wg show
+  else
+    echo "down"
+  fi
+}
+
+cmd_check() {
+  local ip
+  ip="$(curl -s https://api.ipify.org || true)"
+  echo "public IP: ${ip:-unknown}"
+  if ping -c 1 -t 2 192.168.1.1 >/dev/null 2>&1; then
+    echo "192.168.1.1: reachable (inside LAN)"
+  else
+    echo "192.168.1.1: unreachable"
+  fi
+}
+
+main() {
+  case "${1:-}" in
+    install) cmd_install ;;
+    up) cmd_up ;;
+    down) cmd_down ;;
+    status) cmd_status ;;
+    check) cmd_check ;;
+    *) usage; exit 1 ;;
+  esac
+}
+
+main "$@"

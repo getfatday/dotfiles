@@ -1,0 +1,10 @@
+---
+# WireGuard client tooling + 1Password-backed per-host tunnel config for the apartment LAN
+# ("station-wg" server on the UDR7). The .conf is never in this repo: `wg-station install`
+# fetches it from 1Password at runtime.
+
+homebrew_packages:
+  - wireguard-tools             # wg, wg-quick (pulls wireguard-go userspace implementation)
+
+stow_dirs:
+  - wireguard
