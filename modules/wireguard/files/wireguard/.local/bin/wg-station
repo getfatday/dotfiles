@@ -26,7 +26,7 @@ require_op() {
     echo "op (1Password CLI) not found on PATH." >&2
     exit 1
   fi
-  if ! op whoami >/dev/null 2>&1; then
+  if ! op vault list >/dev/null 2>&1; then
     echo "run: op signin" >&2
     exit 1
   fi
