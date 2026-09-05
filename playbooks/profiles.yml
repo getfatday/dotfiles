@@ -50,6 +50,7 @@ base_modules:
   - spotify
   - tmux
   - vscode
+  - wireguard
   - workmux
   - zsh
 
