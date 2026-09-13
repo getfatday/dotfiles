@@ -1,0 +1,25 @@
+---
+# Finance agent module
+# Tooling Claude Code agents use for bill oversight in ~/src/finances:
+# the Playwright CLI driving the installed Google Chrome, and the Copilot Money CLI.
+# Relies on: chrome (Google Chrome), node, dotm (uv).
+
+homebrew_packages:
+  - playwright-cli          # Playwright CLI for agent browser sessions (portal SOPs)
+
+# Source for the Copilot Money CLI (clis/copilot-money-cli)
+git_repositories:
+  - repo: "https://github.com/getfatday/skills.git"
+    dest: "~/src/skills"
+    version: "main"
+    update: false           # never clobber local work in the checkout
+
+# Stow directories for finance agent scripts
+stow_dirs:
+  - finance-agent
+
+# Note: ansible cannot run uv, so after install run once:
+#   finance-agent-setup          # install gfd-copilot-money, idempotent
+#   finance-agent-setup --check  # verify only
+# gfd-copilot-money is pinned to Python 3.12 because plyvel-ci has no 3.14 build.
+# No credentials live in this module.
