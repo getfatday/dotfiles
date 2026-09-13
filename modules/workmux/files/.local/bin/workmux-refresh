@@ -41,7 +41,7 @@ trap 'rm -f "$LOCK_FILE"' EXIT
 
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
 
-VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia"
+VAULT="$HOME/src/vault"
 SESSION_DIR="$VAULT/Sessions"
 STALE_THRESHOLD_SECS="${STALE_THRESHOLD_SECS:-7200}"
 LOG_FILE="${WORKMUX_REFRESH_LOG:-$HOME/Library/Logs/workmux-refresh.log}"

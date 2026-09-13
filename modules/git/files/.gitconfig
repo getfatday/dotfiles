@@ -3,7 +3,25 @@
   email = getfatday@gmail.com
   signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHQCDl9wUFLPF1cvH4+PAXir0HcGu/ZtZmIkq9o1zky2
 
-[includeIf "hasconfig:remote.*.url:*github.com:eg-internal/**"]
+# Expedia identity: any Expedia-owned remote uses the work email (config-work).
+# Covers both HTTPS (github.com/org/) and SSH (github.com:org/) URL forms.
+# github.com Expedia orgs
+[includeIf "hasconfig:remote.*.url:https://github.com/eg-internal/**"]
+  path = ~/.config/git/config-work
+[includeIf "hasconfig:remote.*.url:git@github.com:eg-internal/**"]
+  path = ~/.config/git/config-work
+[includeIf "hasconfig:remote.*.url:https://github.com/ianderson_expedia/**"]
+  path = ~/.config/git/config-work
+[includeIf "hasconfig:remote.*.url:git@github.com:ianderson_expedia/**"]
+  path = ~/.config/git/config-work
+[includeIf "hasconfig:remote.*.url:https://github.com/ExpediaGroup/**"]
+  path = ~/.config/git/config-work
+[includeIf "hasconfig:remote.*.url:git@github.com:ExpediaGroup/**"]
+  path = ~/.config/git/config-work
+# github.expedia.biz: entire internal host, any org
+[includeIf "hasconfig:remote.*.url:https://github.expedia.biz/**"]
+  path = ~/.config/git/config-work
+[includeIf "hasconfig:remote.*.url:git@github.expedia.biz:**"]
   path = ~/.config/git/config-work
 
 [core]

@@ -30,7 +30,7 @@ set -euo pipefail
 
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
 
-VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia"
+VAULT="$HOME/src/vault"
 SESSION_DIR="$VAULT/Sessions"
 IDLE_THRESHOLD_SECS="${IDLE_THRESHOLD_SECS:-86400}"
 LOG_FILE="${WORKMUX_AUTO_CLOSE_LOG:-$HOME/Library/Logs/workmux-auto-close.log}"
