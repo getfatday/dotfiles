@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import sys
 
@@ -12,6 +14,15 @@ from dotm.modules import get_deploy_modules
 from dotm.security import scan_changed_files, print_scan_results
 
 console = Console()
+
+
+def _text(data) -> str:
+    """Bytes or text from a subprocess, as text; None becomes the empty string."""
+    if data is None:
+        return ""
+    if isinstance(data, (bytes, bytearray)):
+        return data.decode("utf-8", "replace")
+    return str(data)
 
 
 def git_pull(repo_path, quiet: bool = False) -> bool:
@@ -57,26 +68,34 @@ def ansible_apply(repo_path, excluded: list[str], quiet: bool = False) -> bool:
     ]
 
     # 1800 s: a first apply after new casks or npm installs can take well over 10 minutes.
-    # A timeout is caught and reported instead of surfacing as an uncaught traceback that
-    # kills the play and leaves the launchd log with no Ansible output.
+    # The play runs in its own process group so a timeout kills Ansible's forked workers as
+    # well (they otherwise outlive the run as orphans), and whatever Ansible printed before
+    # the stop is written to the log. The timeout exception carries bytes, not text.
     timeout_s = 1800
+    proc = subprocess.Popen(
+        cmd, cwd=repo_path, start_new_session=True,
+        stdout=subprocess.PIPE if quiet else None,
+        stderr=subprocess.PIPE if quiet else None,
+    )
     try:
-        if quiet:
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_path, timeout=timeout_s)
-        else:
-            result = subprocess.run(cmd, text=True, cwd=repo_path, timeout=timeout_s)
+        out_b, err_b = proc.communicate(timeout=timeout_s)
     except subprocess.TimeoutExpired as exc:
-        tail = (exc.stdout or "")[-2000:] if isinstance(exc.stdout, str) else ""
-        print(f"dotm sync: ansible-playbook exceeded {timeout_s} s and was stopped.", file=sys.stderr)
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        out_b, err_b = proc.communicate()
+        tail = (_text(out_b) or _text(exc.stdout))[-2000:]
+        print(f"dotm sync: ansible-playbook exceeded {timeout_s} s and was stopped (process group killed).", file=sys.stderr)
         if tail:
             print("dotm sync: last Ansible output before the stop:\n" + tail, file=sys.stderr)
         return False
 
-    if result.returncode != 0:
+    if proc.returncode != 0:
         # Always leave the failure reason in the log, quiet or not: quiet runs feed launchd.
-        err_tail = (result.stderr or "")[-2000:] if quiet else ""
-        out_tail = (result.stdout or "")[-2000:] if quiet else ""
-        print(f"dotm sync: ansible-playbook exited {result.returncode}.", file=sys.stderr)
+        err_tail = _text(err_b)[-2000:] if quiet else ""
+        out_tail = _text(out_b)[-2000:] if quiet else ""
+        print(f"dotm sync: ansible-playbook exited {proc.returncode}.", file=sys.stderr)
         if out_tail:
             print("dotm sync: last Ansible output:\n" + out_tail, file=sys.stderr)
         if err_tail:
