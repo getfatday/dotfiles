@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# finance-agent-setup: install and verify the CLIs agents use for finance oversight.
+# Idempotent. --check verifies without changing anything.
+# Managed by the dotfiles finance-agent module. Never stores credentials.
+set -euo pipefail
+
+CHECK_ONLY=0
+[[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
+
+SKILLS_DIR="$HOME/src/skills"
+CLI_DIR="$SKILLS_DIR/clis/copilot-money-cli"
+CLI_PYTHON="3.12"
+
+fail=0
+ok()  { printf '  ok    %s\n' "$1"; }
+bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
+
+echo "finance-agent-setup$([[ $CHECK_ONLY == 1 ]] && echo ' --check')"
+
+command -v uv >/dev/null 2>&1 && ok "uv on PATH" || bad "uv missing (dotm module)"
+[[ -d "/Applications/Google Chrome.app" ]] && ok "Google Chrome installed" || bad "Google Chrome missing (chrome module)"
+if command -v playwright-cli >/dev/null 2>&1; then
+  ok "playwright-cli $(playwright-cli --version 2>/dev/null | head -1)"
+else
+  bad "playwright-cli missing (dotm install finance-agent)"
+fi
+
+if [[ -d "$CLI_DIR" ]]; then
+  if (( ! CHECK_ONLY )); then
+    uv tool install --quiet --force --python "$CLI_PYTHON" "$CLI_DIR"
+  fi
+  if command -v gfd-copilot-money >/dev/null 2>&1 && gfd-copilot-money --help >/dev/null 2>&1; then
+    ok "gfd-copilot-money runs"
+  else
+    bad "gfd-copilot-money not runnable"
+  fi
+else
+  bad "$CLI_DIR missing (dotm install finance-agent clones getfatday/skills)"
+fi
+
+if (( fail )); then echo "result: FAIL"; exit 1; fi
+echo "result: OK"
