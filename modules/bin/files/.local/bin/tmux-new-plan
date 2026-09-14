@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# tmux-new-plan: PREFIX+o launcher.
+# Captures a prompt in $EDITOR synchronously, then spawns `workmux add` detached
+# so the tmux popup dismisses immediately. New session starts Claude in plan mode.
+set -euo pipefail
+
+LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/workmux-async"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/$(date +%Y%m%d-%H%M%S)-$$.log"
+
+PROMPT_FILE="$(mktemp -t workmux-prompt.XXXXXX).md"
+trap 'rm -f "$PROMPT_FILE.tmp"' EXIT
+
+# Open editor synchronously in the popup. $EDITOR wins; $VISUAL fallback; then vi.
+${EDITOR:-${VISUAL:-vi}} "$PROMPT_FILE"
+
+if [ ! -s "$PROMPT_FILE" ]; then
+  printf 'No prompt written; cancelled.\n' >&2
+  sleep 0.8
+  exit 0
+fi
+
+{
+  echo "--- tmux-new-plan $(date) ---"
+  echo "cwd: $PWD"
+  echo "prompt: $PROMPT_FILE ($(wc -c <"$PROMPT_FILE") bytes)"
+  echo "PATH: $PATH"
+  echo "WM: $(command -v workmux)"
+  echo "about to spawn workmux add -A -b -a claude-plan -P $PROMPT_FILE"
+} >>"$LOG_FILE"
+
+# Use `tmux run-shell` to spawn workmux outside the popup's PTY.
+# The popup's shell (and all its children) die when the popup closes.
+# `tmux run-shell -b` runs in tmux's server process, surviving the popup.
+tmux run-shell -b "workmux add -A -b -a claude-plan -P '$PROMPT_FILE' >>\"$LOG_FILE\" 2>&1; echo '--- workmux exit: '\$?' ---' >>\"$LOG_FILE\""
+
+echo "handed off to tmux run-shell" >>"$LOG_FILE"
+exit 0
