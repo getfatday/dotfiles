@@ -56,16 +56,33 @@ def ansible_apply(repo_path, excluded: list[str], quiet: bool = False) -> bool:
         "--extra-vars", extra_vars,
     ]
 
-    if quiet:
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_path, timeout=600)
-    else:
-        result = subprocess.run(cmd, text=True, cwd=repo_path, timeout=600)
+    # 1800 s: a first apply after new casks or npm installs can take well over 10 minutes.
+    # A timeout is caught and reported instead of surfacing as an uncaught traceback that
+    # kills the play and leaves the launchd log with no Ansible output.
+    timeout_s = 1800
+    try:
+        if quiet:
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=repo_path, timeout=timeout_s)
+        else:
+            result = subprocess.run(cmd, text=True, cwd=repo_path, timeout=timeout_s)
+    except subprocess.TimeoutExpired as exc:
+        tail = (exc.stdout or "")[-2000:] if isinstance(exc.stdout, str) else ""
+        print(f"dotm sync: ansible-playbook exceeded {timeout_s} s and was stopped.", file=sys.stderr)
+        if tail:
+            print("dotm sync: last Ansible output before the stop:\n" + tail, file=sys.stderr)
+        return False
 
     if result.returncode != 0:
+        # Always leave the failure reason in the log, quiet or not: quiet runs feed launchd.
+        err_tail = (result.stderr or "")[-2000:] if quiet else ""
+        out_tail = (result.stdout or "")[-2000:] if quiet else ""
+        print(f"dotm sync: ansible-playbook exited {result.returncode}.", file=sys.stderr)
+        if out_tail:
+            print("dotm sync: last Ansible output:\n" + out_tail, file=sys.stderr)
+        if err_tail:
+            print("dotm sync: Ansible stderr:\n" + err_tail, file=sys.stderr)
         if not quiet:
             console.print("[red]Ansible apply failed[/red]")
-            if hasattr(result, "stderr") and result.stderr:
-                console.print(result.stderr[:500])
         return False
 
     return True
