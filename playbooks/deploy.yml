@@ -34,6 +34,28 @@
         final_modules: "{{ base_modules | unique | sort }}"
       when: detected_profile == 'unknown'
 
+    # Homebrew 6+ refuses to load formulae, casks or commands from non-official taps until
+    # `brew trust` has recorded them, and HOMEBREW_NO_REQUIRE_TAP_TRUST is deprecated. Trust
+    # exactly the taps the selected modules declare, before the role taps them and installs
+    # from them. `brew trust` is idempotent: it prints "Already trusted" on repeat and exits 0
+    # either way, so this stays deterministic and re-runnable.
+    - name: Collect Homebrew taps declared by the selected modules
+      ansible.builtin.set_fact:
+        declared_homebrew_taps: >-
+          {{
+            (declared_homebrew_taps | default([]))
+            + ((lookup('file', playbook_dir ~ '/../modules/' ~ item ~ '/config.yml')
+                | from_yaml | default({}, true)).homebrew_taps | default([]))
+          }}
+      loop: "{{ final_modules }}"
+
+    - name: Trust the Homebrew taps the selected modules declare
+      ansible.builtin.command:
+        argv: ["/opt/homebrew/bin/brew", "trust", "--tap", "{{ item }}"]
+      loop: "{{ declared_homebrew_taps | default([]) | unique }}"
+      register: brew_trust
+      changed_when: brew_trust.stdout is search('^Trusted tap')
+
     - name: Show deployment plan
       ansible.builtin.debug:
         msg: "Profile: {{ detected_profile }} | Modules ({{ final_modules | length }}): {{ final_modules | join(', ') }}"
