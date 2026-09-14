@@ -3,11 +3,13 @@ base_branch: origin/main
 merge_strategy: rebase
 agents:
   claude: "claude --dangerously-skip-permissions"
+  claude-plan: "claude --dangerously-skip-permissions --permission-mode plan"
 agent: claude
 theme: obsidian-pop
 
 auto_name:
   background: true
+  command: "claude --model haiku -p"
 
 sidebar:
   width: 35
@@ -19,6 +21,14 @@ files:
 
 post_create:
   - git fetch origin main --quiet 2>/dev/null || true
+  - 'bash "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia/scripts/workmux-session-create.sh" 2>/dev/null || true'
+
+pre_merge:
+  - 'echo "$WM_TARGET_BRANCH" > .workmux/merge-target 2>/dev/null || true'
+  - 'bash "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia/scripts/workmux-session-gather.sh" 2>/dev/null || true'
+
+pre_remove:
+  - 'bash "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Expedia/scripts/workmux-session-close.sh" 2>/dev/null || true'
 
 panes:
   - command: <agent>
