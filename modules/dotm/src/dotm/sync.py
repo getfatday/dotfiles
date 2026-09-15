@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import subprocess
@@ -10,7 +11,6 @@ import sys
 from rich.console import Console
 
 from dotm.config import get_dotfiles_repo, get_excluded_modules
-from dotm.modules import get_deploy_modules
 from dotm.security import scan_changed_files, print_scan_results
 
 console = Console()
@@ -43,22 +43,25 @@ def git_pull(repo_path, quiet: bool = False) -> bool:
 
 
 def ansible_apply(repo_path, excluded: list[str], quiet: bool = False) -> bool:
-    """Run ansible-playbook with the effective module list."""
+    """Run ansible-playbook; deploy.yml resolves the module list for this host."""
     deploy_yml = repo_path / "playbooks" / "deploy.yml"
     if not deploy_yml.exists():
         if not quiet:
             console.print("[red]deploy.yml not found[/red]")
         return False
 
-    all_modules = get_deploy_modules()
-    effective = [m for m in all_modules if m not in excluded]
-
     if not quiet:
-        console.print(f"[dim]Applying {len(effective)} modules (excluding {len(excluded)})...[/dim]")
+        console.print(
+            f"[dim]Applying the module list deploy.yml resolves for this host "
+            f"(excluding {len(excluded)})...[/dim]"
+        )
 
-    # Build the install list as extra vars
-    install_json = "[" + ", ".join(f'"{m}"' for m in effective) + "]"
-    extra_vars = f'{{"final_modules": {install_json}}}'
+    # deploy.yml is the single place a profile turns into a module list: it resolves the
+    # list from profiles.yml (base_modules plus the host's profile). dotm hands it no list,
+    # because an explicit list on the command line overrides that resolution and makes
+    # profiles dead on the path machines actually use. The only extra var is this machine's
+    # excluded_modules from the dotm config, which the play subtracts last.
+    extra_vars = json.dumps({"dotm_excluded_modules": list(excluded)})
 
     inventory = repo_path / "playbooks" / "inventory"
     cmd = [

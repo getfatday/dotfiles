@@ -19,19 +19,28 @@
       ansible.builtin.set_fact:
         detected_profile: "{{ hostname_to_profile[ansible_facts.hostname] | default('unknown') }}"
 
+    # This is the single place a profile turns into a module list. dotm sync passes no
+    # list; its only extra var is dotm_excluded_modules, this machine's excluded_modules
+    # from ~/.config/dotm/config.yml, subtracted last in both branches.
     - name: Compute final module list
       ansible.builtin.set_fact:
         final_modules: >-
           {{
             (base_modules + (profiles[detected_profile].include | default([])))
             | difference(profiles[detected_profile].exclude | default([]))
+            | difference(dotm_excluded_modules | default([]))
             | unique | sort
           }}
       when: detected_profile != 'unknown'
 
     - name: Use base modules for unknown hostname
       ansible.builtin.set_fact:
-        final_modules: "{{ base_modules | unique | sort }}"
+        final_modules: >-
+          {{
+            base_modules
+            | difference(dotm_excluded_modules | default([]))
+            | unique | sort
+          }}
       when: detected_profile == 'unknown'
 
     # Homebrew 6+ refuses to load formulae, casks or commands from non-official taps until
