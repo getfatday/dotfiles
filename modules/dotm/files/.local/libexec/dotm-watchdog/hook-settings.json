@@ -1,0 +1,17 @@
+{
+  "_comment": "Template for the --settings file watchdog.py writes per launch. __HOOK_CMD__ is replaced by the literal `python3 <abs hook-guard.py> --log <abs hook.log.N> --state-dir <abs state dir> --repo <owner/repo>` line; no env dependence inside the hook. Empty matcher: the hook fires on every tool call, so Read calls are logged too.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__HOOK_CMD__",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
