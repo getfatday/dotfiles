@@ -1,10 +1,10 @@
 ---
 # Hostname-to-profile mapping.
 # Intentionally empty in this public file: host names are machine-local and are not
-# published. Every host therefore resolves to 'unknown' and receives base_modules, which
-# is also what dotm-driven runs apply (dotm passes the module list to Ansible explicitly
-# and never reads this map). Profile selection by host capability is the planned
-# replacement; the profiles below stay for it.
+# published. Every host therefore resolves to 'unknown' and receives base_modules minus
+# the machine's dotm excluded_modules. deploy.yml is the single place this resolution
+# happens; dotm sync passes no module list. Profile selection by host capability is the
+# planned replacement; the profiles below stay for it.
 hostname_to_profile: {}
 
 # Base modules installed on ALL systems
