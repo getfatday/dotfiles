@@ -264,41 +264,42 @@ def doctor():
 
 @main.command()
 @click.option("--host", help="Remote host IP/hostname")
-@click.option("--user", default="ianderson", help="Remote user")
+@click.option("--user", default=None, help="Remote user (default: $USER)")
 def bootstrap(host, user):
-    """Bootstrap dotfiles on a remote Mac."""
+    """Bootstrap dotfiles on a remote Mac: clone the repo, then print the next step."""
+    import os
     import subprocess
 
     if not host:
         console.print("[red]--host is required[/red]")
         sys.exit(1)
+    user = user or os.environ.get("USER")
+    if not user:
+        console.print("[red]--user is required when $USER is not set[/red]")
+        sys.exit(1)
 
-    repo = get_dotfiles_repo()
-    console.print(f"[dim]Bootstrapping {user}@{host}...[/dim]")
+    target = f"{user}@{host}"
+    console.print(f"[dim]Bootstrapping {target}...[/dim]")
 
-    # Copy the repo to the remote host
     result = subprocess.run(
-        ["ssh", f"{user}@{host}", "test", "-d", "~/src/dotfiles"],
+        ["ssh", target, "test", "-d", "~/src/dotfiles"],
         capture_output=True,
     )
     if result.returncode != 0:
         console.print("[dim]Cloning dotfiles repo on remote...[/dim]")
-        subprocess.run(
-            ["ssh", f"{user}@{host}", "git", "clone",
-             "https://github.com/getfatday/dotfiles.git", "~/src/dotfiles"],
-            check=True,
+        # gh clones with the remote user's own credentials; plain git is the anonymous fallback
+        clone = (
+            "if command -v gh >/dev/null 2>&1; then gh repo clone getfatday/dotfiles ~/src/dotfiles; "
+            "else git clone https://github.com/getfatday/dotfiles.git ~/src/dotfiles; fi"
         )
+        subprocess.run(["ssh", target, clone], check=True)
 
-    console.print("[dim]Running sync on remote...[/dim]")
-    result = subprocess.run(
-        ["ssh", f"{user}@{host}", "~/.local/bin/dotm", "sync"],
-        text=True,
-    )
-    if result.returncode == 0:
-        console.print(f"[green]Bootstrap complete for {user}@{host}.[/green]")
-    else:
-        console.print(f"[red]Bootstrap failed.[/red]")
-        sys.exit(1)
+    # A fresh account has no ~/.local/bin/dotm yet (the wrapper is stowed by the first sync),
+    # so the first sync runs straight from the clone once uv is present.
+    console.print(f"[green]Repository ready on {target}.[/green]")
+    console.print("Next, on the remote host:")
+    console.print("  curl -LsSf https://astral.sh/uv/install.sh | sh")
+    console.print("  uv run --project ~/src/dotfiles/modules/dotm/src dotm sync")
 
 
 # --- plan ---
