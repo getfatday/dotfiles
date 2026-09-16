@@ -8,11 +8,14 @@
 	<array>
 		<string>/bin/sh</string>
 		<string>-c</string>
-		<!-- Swap Caps Lock and Control globally, then clear the mapping for HHKB-layout
-		     boards that already send Control from the caps-lock position (the global
-		     swap would turn it into Caps Lock): PFU HHKB (VendorID 1278) and the QMK
-		     tokyo60 (VendorID 0xfeed = 65261). -->
-		<string>/usr/bin/hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x7000000E0},{"HIDKeyboardModifierMappingSrc":0x7000000E0,"HIDKeyboardModifierMappingDst":0x700000039},{"HIDKeyboardModifierMappingSrc":0x7000000E4,"HIDKeyboardModifierMappingDst":0x700000039}]}' ; /usr/bin/hidutil property --matching '{"VendorID":1278}' --set '{"UserKeyMapping":[]}' ; /usr/bin/hidutil property --matching '{"VendorID":65261}' --set '{"UserKeyMapping":[]}'</string>
+		<!-- Swap Caps Lock and Control globally. HHKB-layout boards already send Control
+		     from the caps position, so the global swap would turn it into Caps Lock;
+		     exempt them with a per-device identity mapping in the ByHost global prefs
+		     (com.apple.keyboard.modifiermapping.VID-PID-0), which keyboardservicesd
+		     applies and keeps re-applying. A bare hidutil --matching clear is
+		     overwritten within minutes by the same daemon. PFU HHKB = 1278-33-0,
+		     QMK tokyo60 = 65261-24672-0. -->
+		<string>/usr/bin/hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x7000000E0},{"HIDKeyboardModifierMappingSrc":0x7000000E0,"HIDKeyboardModifierMappingDst":0x700000039},{"HIDKeyboardModifierMappingSrc":0x7000000E4,"HIDKeyboardModifierMappingDst":0x700000039}]}' ; for kb in 1278-33-0 65261-24672-0; do /usr/bin/defaults -currentHost write -g com.apple.keyboard.modifiermapping.$kb -array "&lt;dict&gt;&lt;key&gt;HIDKeyboardModifierMappingSrc&lt;/key&gt;&lt;integer&gt;30064771129&lt;/integer&gt;&lt;key&gt;HIDKeyboardModifierMappingDst&lt;/key&gt;&lt;integer&gt;30064771129&lt;/integer&gt;&lt;/dict&gt;" "&lt;dict&gt;&lt;key&gt;HIDKeyboardModifierMappingSrc&lt;/key&gt;&lt;integer&gt;30064771296&lt;/integer&gt;&lt;key&gt;HIDKeyboardModifierMappingDst&lt;/key&gt;&lt;integer&gt;30064771296&lt;/integer&gt;&lt;/dict&gt;" "&lt;dict&gt;&lt;key&gt;HIDKeyboardModifierMappingSrc&lt;/key&gt;&lt;integer&gt;30064771300&lt;/integer&gt;&lt;key&gt;HIDKeyboardModifierMappingDst&lt;/key&gt;&lt;integer&gt;30064771300&lt;/integer&gt;&lt;/dict&gt;"; done ; /usr/bin/hidutil property --matching '{"VendorID":1278}' --set '{"UserKeyMapping":[]}' ; /usr/bin/hidutil property --matching '{"VendorID":65261}' --set '{"UserKeyMapping":[]}'</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
