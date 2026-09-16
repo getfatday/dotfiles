@@ -21,10 +21,11 @@
 
     # This is the single place a profile turns into a module list. dotm sync passes no
     # list; its only extra var is dotm_excluded_modules, this machine's excluded_modules
-    # from ~/.config/dotm/config.yml, subtracted last in both branches.
-    - name: Compute final module list
+    # from ~/.config/dotm/config.yml, subtracted last in both branches. The result is the
+    # candidate list; the role filter below decides which candidates apply here.
+    - name: Compute candidate module list
       ansible.builtin.set_fact:
-        final_modules: >-
+        candidate_modules: >-
           {{
             (base_modules + (profiles[detected_profile].include | default([])))
             | difference(profiles[detected_profile].exclude | default([]))
@@ -35,13 +36,62 @@
 
     - name: Use base modules for unknown hostname
       ansible.builtin.set_fact:
-        final_modules: >-
+        candidate_modules: >-
           {{
             base_modules
             | difference(dotm_excluded_modules | default([]))
             | unique | sort
           }}
       when: detected_profile == 'unknown'
+
+    # Role resolution. The machine declares its role (and any extra capabilities) in its
+    # local dotm config; profiles.yml says what each role provides. A candidate applies when
+    # every capability under its `requires:` is in the machine's set. A module with no
+    # `requires:` key applies everywhere, so a machine with no role declared, whose set is
+    # empty, receives exactly the candidates that require nothing.
+    - name: Read the role and capabilities this machine declares in its local dotm config
+      ansible.builtin.set_fact:
+        dotm_local_config: >-
+          {{
+            lookup('file', ansible_facts.env.HOME ~ '/.config/dotm/config.yml', errors='ignore')
+            | default('', true) | from_yaml | default({}, true)
+          }}
+
+    - name: Resolve the declared role
+      ansible.builtin.set_fact:
+        dotm_role: "{{ (dotm_local_config.role | default('', true)) | string }}"
+
+    - name: Refuse a role profiles.yml does not define
+      ansible.builtin.assert:
+        that:
+          - dotm_role == '' or dotm_role in role_capabilities
+        fail_msg: >-
+          role '{{ dotm_role }}' in ~/.config/dotm/config.yml is not defined under
+          role_capabilities in playbooks/profiles.yml (known: {{ role_capabilities.keys() | join(', ') }})
+
+    - name: Resolve the machine's capability set
+      ansible.builtin.set_fact:
+        dotm_capabilities: >-
+          {{
+            (((role_capabilities[dotm_role] | default([], true)) if dotm_role != '' else [])
+             + (dotm_local_config.capabilities | default([], true)))
+            | unique
+          }}
+
+    - name: Select the candidates whose requirements the machine's capabilities cover
+      ansible.builtin.set_fact:
+        final_modules: >-
+          {{
+            (final_modules | default([]))
+            + ([item] if (((lookup('file', playbook_dir ~ '/../modules/' ~ item ~ '/config.yml')
+                            | from_yaml | default({}, true)).requires | default([], true))
+                          | difference(dotm_capabilities) | length == 0) else [])
+          }}
+      loop: "{{ candidate_modules }}"
+
+    - name: Order the selected modules
+      ansible.builtin.set_fact:
+        final_modules: "{{ final_modules | default([]) | unique | sort }}"
 
     # Homebrew 6+ refuses to load formulae, casks or commands from non-official taps until
     # `brew trust` has recorded them, and HOMEBREW_NO_REQUIRE_TAP_TRUST is deprecated. Trust
@@ -67,7 +117,7 @@
 
     - name: Show deployment plan
       ansible.builtin.debug:
-        msg: "Profile: {{ detected_profile }} | Modules ({{ final_modules | length }}): {{ final_modules | join(', ') }}"
+        msg: "Role: {{ dotm_role if dotm_role != '' else 'none' }} | Profile: {{ detected_profile }} | Modules ({{ final_modules | length }}): {{ final_modules | join(', ') }}"
 
   roles:
     - role: ansible-role-dotmodules
