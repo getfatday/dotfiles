@@ -8,10 +8,11 @@
 	<array>
 		<string>/bin/sh</string>
 		<string>-c</string>
-		<!-- Swap Caps Lock and Control globally, then clear the mapping for PFU
-		     (VendorID 1278) keyboards: the HHKB already sends Control from the
-		     caps-lock position, so the global swap would turn it into Caps Lock. -->
-		<string>/usr/bin/hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x7000000E0},{"HIDKeyboardModifierMappingSrc":0x7000000E0,"HIDKeyboardModifierMappingDst":0x700000039},{"HIDKeyboardModifierMappingSrc":0x7000000E4,"HIDKeyboardModifierMappingDst":0x700000039}]}' ; /usr/bin/hidutil property --matching '{"VendorID":1278}' --set '{"UserKeyMapping":[]}'</string>
+		<!-- Swap Caps Lock and Control globally, then clear the mapping for HHKB-layout
+		     boards that already send Control from the caps-lock position (the global
+		     swap would turn it into Caps Lock): PFU HHKB (VendorID 1278) and the QMK
+		     tokyo60 (VendorID 0xfeed = 65261). -->
+		<string>/usr/bin/hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x7000000E0},{"HIDKeyboardModifierMappingSrc":0x7000000E0,"HIDKeyboardModifierMappingDst":0x700000039},{"HIDKeyboardModifierMappingSrc":0x7000000E4,"HIDKeyboardModifierMappingDst":0x700000039}]}' ; /usr/bin/hidutil property --matching '{"VendorID":1278}' --set '{"UserKeyMapping":[]}' ; /usr/bin/hidutil property --matching '{"VendorID":65261}' --set '{"UserKeyMapping":[]}'</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
