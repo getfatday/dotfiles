@@ -8,3 +8,4 @@ homebrew_casks:
 
 # Note: This module provides:
 # - f.lux blue light filter for reducing eye strain
+requires: [macos]

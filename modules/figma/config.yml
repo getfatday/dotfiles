@@ -3,3 +3,4 @@
 
 homebrew_casks:
   - figma
+requires: [macos]

@@ -22,3 +22,8 @@ mergeable_files:
 # - Docker CLI completions
 # - Docker aliases and functions
 # - Container development tools
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - docker.io
+  - docker-compose

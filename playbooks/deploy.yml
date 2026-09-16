@@ -74,7 +74,7 @@
         dotm_capabilities: >-
           {{
             (((role_capabilities[dotm_role] | default([], true)) if dotm_role != '' else [])
-             + (dotm_local_config.capabilities | default([], true)))
+             + (dotm_local_config.capabilities | default([], true)) + (dotm_platform | default(['macos', 'brew', 'gui'])))
             | unique
           }}
 

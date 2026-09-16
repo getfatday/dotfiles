@@ -24,3 +24,7 @@ mergeable_files:
 # - Global npm packages via pnpm
 # - .tool-versions file for asdf
 # - pnpm configuration files
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - nodejs

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
+import json
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -16,6 +19,7 @@ from dotm.config import (
     get_dotfiles_repo,
     get_excluded_modules,
     get_modules_dir,
+    get_platform,
     get_role,
 )
 
@@ -23,6 +27,19 @@ console = Console()
 
 # A capability name as it appears under a module's `requires:` and a role's list in profiles.yml.
 CAPABILITY_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+# The platform is a capability list a machine declares in ~/.config/dotm/config.yml (`platform:`),
+# beside its role. Each package-manager capability unlocks the module config keys it installs
+# from; a module key no capability unlocks is left alone, so a module with only Homebrew items
+# resolves to nothing on a machine without brew. A machine that declares no platform is a Mac
+# with Homebrew and a display, which is what every machine was before the key existed.
+PLATFORM_PACKAGE_KEYS: dict[str, tuple[str, ...]] = {
+    "brew": ("homebrew_taps", "homebrew_packages", "homebrew_casks"),
+    "macos": ("mas_installed_apps",),
+    "apt": ("apt_packages",),
+}
+PACKAGE_KEYS: tuple[str, ...] = tuple(k for keys in PLATFORM_PACKAGE_KEYS.values() for k in keys)
+PLATFORM_CAPABILITIES = frozenset({"macos", "brew", "gui", "linux-arm", "apt", "headless"})
 
 
 def module_requires(config: dict, name: str) -> list[str]:
@@ -103,8 +120,12 @@ def select_modules(candidates: list[str], capabilities: set[str],
 
 
 def unprovided_requirements(modules: list[dict] | None = None) -> dict[str, list[str]]:
-    """Module -> capabilities it requires that no role in profiles.yml provides."""
-    provided = {c for caps in get_role_capabilities().values() for c in caps}
+    """Module -> capabilities it requires that no role in profiles.yml provides.
+
+    Platform capabilities are provided by a machine's `platform:` list, not by a role, so they
+    never count as missing here.
+    """
+    provided = {c for caps in get_role_capabilities().values() for c in caps} | PLATFORM_CAPABILITIES
     missing = {}
     for mod in modules if modules is not None else list_all_modules():
         gap = [c for c in mod.get("requires", []) if c not in provided]
@@ -134,11 +155,33 @@ def list_all_modules() -> list[dict]:
             "homebrew_casks": config.get("homebrew_casks", []),
             "homebrew_taps": config.get("homebrew_taps", []),
             "mas_installed_apps": config.get("mas_installed_apps", []),
+            "apt_packages": config.get("apt_packages", []),
             "stow_dirs": config.get("stow_dirs", []),
             "mergeable_files": config.get("mergeable_files", []),
             "requires": module_requires(config, mod_dir.name),
         })
     return modules
+
+
+def resolve_packages(modules: list[dict], platform: list[str], report=None) -> dict[str, list]:
+    """Per-manager sorted package lists for the given modules on a machine with `platform`.
+
+    Only the config keys the platform's capabilities unlock (PLATFORM_PACKAGE_KEYS) are read, so a
+    linux-arm machine never sees a Homebrew item. Every module that contributes nothing on this
+    platform is reported through `report` (one line naming the module) when a callable is given.
+    """
+    caps = set(platform)
+    keys = [k for cap, cap_keys in PLATFORM_PACKAGE_KEYS.items() if cap in caps for k in cap_keys]
+    resolved: dict[str, set] = {k: set() for k in keys}
+    for mod in modules:
+        contributed = 0
+        for k in keys:
+            items = mod.get(k) or []
+            resolved[k].update(items)
+            contributed += len(items)
+        if contributed == 0 and report is not None:
+            report(f"resolve: module '{mod['name']}' contributes no packages for platform [{', '.join(platform)}]")
+    return {k: sorted(v) for k, v in resolved.items()}
 
 
 def get_deploy_modules() -> list[str]:
@@ -358,3 +401,43 @@ def print_status() -> None:
     console.print(f"  Role: {get_role() or 'none'}")
     for name, gap in sorted(unprovided_requirements(modules).items()):
         console.print(f"  [yellow]{name} requires {', '.join(gap)}, which no role provides[/yellow]")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """`python -m dotm.modules resolve`: print the per-manager package lists as JSON.
+
+    --platform names the capability list (default: this machine's `platform:` from the dotm
+    config, or the macOS default); --role names the role whose capabilities join the platform for
+    module selection (default: this machine's role); --modules resolves exactly the named modules
+    instead of the selected set. Selection is the one deploy.yml performs (select_modules over
+    the machine's capability set plus its platform). Modules that contribute nothing are reported
+    on stderr.
+    """
+    parser = argparse.ArgumentParser(prog="python -m dotm.modules")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    r = sub.add_parser("resolve", help="per-manager package lists for a platform")
+    r.add_argument("--platform", help="comma-separated capability list, e.g. linux-arm,apt,headless")
+    r.add_argument("--role", help="role whose capabilities join the platform for selection")
+    r.add_argument("--modules", help="comma-separated module names to resolve instead of the selected set")
+    args = parser.parse_args(argv)
+    platform = [c for c in (args.platform.split(",") if args.platform else get_platform()) if c]
+    role = args.role or get_role()
+    modules = list_all_modules()
+    by_name = {m["name"]: m for m in modules}
+    if args.modules:
+        wanted = [m for m in args.modules.split(",") if m]
+        missing = [m for m in wanted if m not in by_name]
+        if missing:
+            print(f"resolve: unknown module(s): {', '.join(missing)}", file=sys.stderr)
+            return 2
+        chosen = [by_name[m] for m in wanted]
+    else:
+        capabilities = resolve_capabilities(role, get_declared_capabilities()) | set(platform)
+        chosen = [by_name[n] for n in select_modules(get_deploy_modules(), capabilities) if n in by_name]
+    result = resolve_packages(chosen, platform, report=lambda line: print(line, file=sys.stderr))
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

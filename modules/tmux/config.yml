@@ -17,3 +17,7 @@ stow_dirs:
 # - macOS clipboard integration via reattach-to-user-namespace
 # - Dracula theme via TPM plugin
 # - Enables persistent terminal sessions across SSH disconnects
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - tmux

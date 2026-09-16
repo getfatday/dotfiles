@@ -8,3 +8,7 @@ homebrew_packages:
 
 stow_dirs:
   - wireguard
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - wireguard-tools

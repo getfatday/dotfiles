@@ -8,3 +8,4 @@ homebrew_casks:
 
 # Note: This module provides:
 # - Dropbox cloud file storage and sync
+requires: [macos]

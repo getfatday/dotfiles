@@ -9,3 +9,4 @@ homebrew_casks:
 # Note: This module provides:
 # - Handbrake video transcoder from Homebrew Cask
 # - Handbrake configuration files (if any)
+requires: [macos]

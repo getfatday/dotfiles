@@ -8,3 +8,4 @@ homebrew_casks:
 
 # Note: This module provides:
 # - Sequel Ace MySQL/MariaDB database management GUI (successor to Sequel Pro)
+requires: [macos]

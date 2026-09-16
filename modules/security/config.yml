@@ -12,3 +12,8 @@ homebrew_packages:
 # - GnuPG for encryption, signing, and key management
 # - macOS Keychain-integrated pinentry for GPG passphrases
 # - SOPS for encrypting/decrypting secret files (YAML, JSON, ENV)
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - gnupg
+  - pinentry-curses

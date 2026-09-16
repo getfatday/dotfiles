@@ -8,3 +8,4 @@ homebrew_casks:
 
 # Note: This module provides:
 # - Mozilla Firefox web browser from Homebrew Cask
+requires: [macos]

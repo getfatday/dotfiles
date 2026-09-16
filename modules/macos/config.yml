@@ -32,3 +32,4 @@ mergeable_files:
 # - Safari developer tools
 # - Hot corners configuration
 # - Spotlight exclusions
+requires: [macos]

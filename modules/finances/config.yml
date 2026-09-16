@@ -16,3 +16,4 @@ stow_dirs:
 # - Investment tracking capabilities
 # - Subscription management
 # - Finance configuration files (if any)
+requires: [macos]

@@ -4,3 +4,4 @@
 
 homebrew_casks:
   - keepingyouawake
+requires: [macos]

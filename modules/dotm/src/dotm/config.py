@@ -14,12 +14,20 @@ DEFAULT_CONFIG = {
     # role and no capabilities the set is empty, so only modules that require nothing apply.
     "role": None,
     "capabilities": [],
+    # The machine's platform: the capability list naming its package manager and display
+    # (macos, brew, gui for a Mac; linux-arm, apt, headless for a Pi). It joins the role's
+    # capabilities for selection and gates which package keys the role installs from. Unset
+    # means the macOS default, which is what every machine was before the key existed.
+    "platform": None,
     "excluded_modules": [],
     "sync": {
         "interval_minutes": 30,
         "auto_apply": True,
     },
 }
+
+# The platform a machine has when it declares none: a Mac with Homebrew and a display.
+DEFAULT_PLATFORM = ["macos", "brew", "gui"]
 
 CONFIG_DIR = Path.home() / ".config" / "dotm"
 CONFIG_FILE = CONFIG_DIR / "config.yml"
@@ -112,3 +120,10 @@ def get_declared_capabilities() -> list[str]:
     config = load_config()
     value = config.get("capabilities") or []
     return [str(c) for c in value]
+
+
+def get_platform() -> list[str]:
+    """The capability list this machine declares under `platform:` (the macOS default when none)."""
+    config = load_config()
+    value = config.get("platform")
+    return [str(c) for c in value] if value else list(DEFAULT_PLATFORM)

@@ -8,3 +8,4 @@ homebrew_casks:
 
 # Note: This module provides:
 # - ngrok secure tunneling to localhost for development and webhooks
+requires: [macos]

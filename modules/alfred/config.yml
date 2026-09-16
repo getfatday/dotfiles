@@ -21,3 +21,4 @@ mergeable_files:
 # - Integration with other tools
 # - Productivity automation
 # - Spotlight hotkey management (merged with macOS .osx)
+requires: [macos]
