@@ -66,12 +66,29 @@ def test_ansible_apply_fails_without_deploy_yml(tmp_path):
 
 def test_deploy_yml_applies_dotm_exclusions_in_both_resolution_branches():
     text = DEPLOY_YML.read_text()
-    # Every set_fact of final_modules lives in deploy.yml, and each one subtracts the
-    # exclusions dotm passes.
-    branches = re.findall(r"final_modules: >-\n(.*?)\n      when:", text, re.S)
+    # Both candidate-list branches (known, unknown profile) live in deploy.yml, and each one
+    # subtracts the exclusions dotm passes before the role filter sees the list.
+    branches = re.findall(r"candidate_modules: >-\n(.*?)\n      when:", text, re.S)
     assert len(branches) == 2, "expected one set_fact per branch (known, unknown profile)"
     for body in branches:
         assert "difference(dotm_excluded_modules | default([]))" in body
-    # sync.py hands the play no list: deploy.yml is the single resolution point.
+    # sync.py hands the play no list and no role: deploy.yml is the single resolution point.
     sync_src = Path(sync_mod.__file__).read_text()
     assert "final_modules" not in sync_src
+    assert "dotm_role" not in sync_src
+
+
+def test_deploy_yml_selects_final_modules_from_candidates_by_requires():
+    text = DEPLOY_YML.read_text()
+    # The role filter loops over the candidate list, reads each module's `requires:` and
+    # keeps the module when the machine's capability set covers it.
+    select = re.search(r"final_modules: >-\n(.*?)\n      loop: \"\{\{ candidate_modules \}\}\"", text, re.S)
+    assert select is not None
+    assert ".requires | default([], true)" in select.group(1)
+    assert "difference(dotm_capabilities) | length == 0" in select.group(1)
+    # The role and the capability set come from the machine's local dotm config, never a
+    # host name or an extra var.
+    assert "/.config/dotm/config.yml" in text
+    assert "dotm_local_config.role" in text
+    assert "dotm_local_config.capabilities" in text
+    assert "role_capabilities[dotm_role]" in text

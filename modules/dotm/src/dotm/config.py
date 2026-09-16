@@ -8,6 +8,12 @@ import yaml
 
 DEFAULT_CONFIG = {
     "dotfiles_repo": "~/src/dotfiles",
+    # The machine's role (work, personal, mixed, or any role playbooks/profiles.yml names)
+    # and any capabilities it declares directly. deploy.yml reads both from this file and
+    # selects the modules whose `requires:` the resulting capability set covers. With no
+    # role and no capabilities the set is empty, so only modules that require nothing apply.
+    "role": None,
+    "capabilities": [],
     "excluded_modules": [],
     "sync": {
         "interval_minutes": 30,
@@ -85,3 +91,24 @@ def include_module(name: str) -> None:
         excluded.remove(name)
         config["excluded_modules"] = excluded
         save_config(config)
+
+
+def get_role() -> str | None:
+    """Return the role this machine declares, or None when it declares none."""
+    config = load_config()
+    role = config.get("role")
+    return str(role) if role else None
+
+
+def set_role(name: str | None) -> None:
+    """Declare this machine's role in the local config (None clears it)."""
+    config = load_config()
+    config["role"] = name
+    save_config(config)
+
+
+def get_declared_capabilities() -> list[str]:
+    """Capabilities this machine declares directly under `capabilities:` (not via its role)."""
+    config = load_config()
+    value = config.get("capabilities") or []
+    return [str(c) for c in value]
