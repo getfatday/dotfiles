@@ -6,7 +6,7 @@ roles:
     # Pinned on purpose: every machine installs the same role revision.
     # To bump: pick the new sha from github.com/getfatday/ansible-role-dotmodules,
     # set it here, then `ansible-galaxy install -r requirements.yml --force`.
-    version: b7e01acd4c146ef527cea4bf79ee5ca1fe304265
+    version: 148a2556f5e72dab02b08a99c2e6da468df8a6df
 
 collections:
   - name: geerlingguy.mac

@@ -23,3 +23,7 @@ mergeable_files:
   - ".zshrc"
   - ".zshenv"
   - ".zpreztorc"
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - zsh

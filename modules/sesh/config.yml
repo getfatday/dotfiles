@@ -12,3 +12,7 @@ stow_dirs:
 
 mergeable_files:
   - ".zshrc"
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - zoxide

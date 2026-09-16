@@ -16,3 +16,11 @@ mergeable_files:
   - ".zpreztorc"
   - ".zshrc"
   - ".zshenv"
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - git
+  - git-delta
+  - git-filter-repo
+  - git-flow
+  - gh

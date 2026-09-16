@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from dotm import sync as sync_mod
+from dotm.config import DEFAULT_PLATFORM
 
 DEPLOY_YML = Path(__file__).resolve().parents[4] / "playbooks" / "deploy.yml"
 
@@ -18,7 +19,7 @@ class _FakeProc:
         return (b"", b"")
 
 
-def _run_apply(tmp_path, excluded):
+def _run_apply(tmp_path, excluded, platform=DEFAULT_PLATFORM):
     (tmp_path / "playbooks").mkdir()
     (tmp_path / "playbooks" / "deploy.yml").write_text("---\n")
     calls = []
@@ -27,7 +28,8 @@ def _run_apply(tmp_path, excluded):
         calls.append(list(cmd))
         return _FakeProc()
 
-    with patch("dotm.sync.subprocess.Popen", side_effect=fake_popen):
+    with patch("dotm.sync.subprocess.Popen", side_effect=fake_popen), \
+         patch("dotm.sync.get_platform", return_value=list(platform)):
         assert sync_mod.ansible_apply(tmp_path, excluded=excluded, quiet=True)
     assert len(calls) == 1
     return calls[0]
@@ -48,14 +50,22 @@ def test_ansible_apply_hands_the_play_no_module_list(tmp_path):
     assert "final_modules" not in extra
 
 
-def test_ansible_apply_passes_dotm_exclusions_as_the_only_extra_var(tmp_path):
+def test_ansible_apply_passes_exclusions_and_platform_as_the_only_extra_vars(tmp_path):
+    """The play gets exactly two machine facts from the dotm config: exclusions and platform."""
     cmd = _run_apply(tmp_path, excluded=["foo", "bar"])
-    assert _extra_vars(cmd) == {"dotm_excluded_modules": ["foo", "bar"]}
+    assert _extra_vars(cmd) == {"dotm_excluded_modules": ["foo", "bar"],
+                                "dotm_platform": ["macos", "brew", "gui"]}
 
 
-def test_ansible_apply_passes_empty_exclusions_when_none_configured(tmp_path):
+def test_ansible_apply_passes_empty_exclusions_and_the_macos_default_when_none_configured(tmp_path):
+    """A machine with no `platform:` key is a Mac: unchanged behavior for every live machine."""
     cmd = _run_apply(tmp_path, excluded=[])
-    assert _extra_vars(cmd) == {"dotm_excluded_modules": []}
+    assert _extra_vars(cmd) == {"dotm_excluded_modules": [], "dotm_platform": ["macos", "brew", "gui"]}
+
+
+def test_ansible_apply_passes_the_declared_platform_through(tmp_path):
+    cmd = _run_apply(tmp_path, excluded=[], platform=["linux-arm", "apt", "headless"])
+    assert _extra_vars(cmd)["dotm_platform"] == ["linux-arm", "apt", "headless"]
 
 
 def test_ansible_apply_fails_without_deploy_yml(tmp_path):
@@ -92,3 +102,13 @@ def test_deploy_yml_selects_final_modules_from_candidates_by_requires():
     assert "dotm_local_config.role" in text
     assert "dotm_local_config.capabilities" in text
     assert "role_capabilities[dotm_role]" in text
+
+
+def test_deploy_yml_joins_the_declared_platform_into_the_capability_set():
+    text = DEPLOY_YML.read_text()
+    # The platform dotm passes joins the role's capabilities in the one resolution step, with
+    # the macOS default when a machine (or a play run by hand) passes none.
+    step = re.search(r"Resolve the machine's capability set\n(.*?)\n\n", text, re.S)
+    assert step is not None
+    assert "dotm_platform | default(['macos', 'brew', 'gui'])" in step.group(1)
+    assert text.count("dotm_platform") == 1

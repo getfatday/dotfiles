@@ -28,3 +28,4 @@ stow_dirs:
 # - Custom vault configurations and templates
 # - Integration with other productivity tools
 # - Knowledge management workflows
+requires: [macos]

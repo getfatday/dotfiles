@@ -3,3 +3,4 @@
 
 homebrew_casks:
   - font-jetbrains-mono-nerd-font   # JetBrains Mono with Nerd Font glyphs
+requires: [macos]

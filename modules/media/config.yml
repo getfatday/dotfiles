@@ -13,3 +13,9 @@ homebrew_packages:
 # - ImageMagick for image processing (convert, mogrify, identify)
 # - Streamlink for extracting streams from web services
 # - ffmpeg brings many codec dependencies automatically
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - ffmpeg
+  - imagemagick
+  - streamlink

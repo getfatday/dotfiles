@@ -113,6 +113,16 @@ Each module's `config.yml` file defines:
 - **Homebrew casks** to install
 - **Stow directories** for dotfile deployment
 - **Mac App Store apps** to install
+- **apt packages** (`apt_packages`) to install where the machine's platform provides apt
+- **Requirements** (`requires`): capabilities the machine must have for the module to apply;
+  a module whose packages are all Homebrew or Mac App Store items declares `requires: [macos]`
+
+Each machine declares its role and platform in `~/.config/dotm/config.yml`. The platform is a
+capability list (`platform: [macos, brew, gui]` for a Mac, `platform: [linux-arm, apt, headless]`
+for a Raspberry Pi; unset means the Mac list). It joins the role's capabilities when modules are
+selected and decides which package keys are installed: `brew` unlocks the `homebrew_*` keys,
+`macos` unlocks `mas_installed_apps`, `apt` unlocks `apt_packages`. Preview the per-manager
+lists with `python -m dotm.modules resolve [--platform linux-arm,apt,headless]`.
 
 Example `config.yml`:
 ```yaml
@@ -132,6 +142,14 @@ homebrew_taps:
 
 stow_dirs:
   - shell
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - zsh
+  - bash
+  - fzf
+  - bat
+  - ripgrep
 ```
 
 ## Customization

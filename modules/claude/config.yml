@@ -19,3 +19,4 @@ mergeable_files:
 # - Configuration files for Claude settings
 # - Integration with other productivity tools
 # - AI-powered assistance workflows
+requires: [macos]

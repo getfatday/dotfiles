@@ -10,3 +10,7 @@ homebrew_packages:
 # - Go compiler and standard library
 # - go build, go test, go fmt, go vet tools
 # - GOPATH and GOBIN environment (configure in .zshenv if needed)
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - golang

@@ -11,8 +11,12 @@ hostname_to_profile: {}
 # Role-to-capability map. Each machine declares its role in its local dotm config
 # (~/.config/dotm/config.yml, key `role`); deploy.yml reads that file and never a host name,
 # so nothing machine-specific lives in this public file. A machine may also list extra
-# capabilities directly under `capabilities:` in the same file (a platform, for instance);
-# the machine's capability set is the union of what its role provides and what it declares.
+# capabilities directly under `capabilities:` in the same file, and declares its platform
+# under `platform:` (macos, brew, gui for a Mac; linux-arm, apt, headless for a Pi; unset
+# means the Mac list); the machine's capability set is the union of what its role provides,
+# what it declares and its platform. The platform also gates which package keys the role
+# installs from: brew unlocks the homebrew_* keys, macos unlocks mas_installed_apps, apt
+# unlocks apt_packages.
 # A module that lists capabilities under `requires:` in its config.yml is selected only when
 # the machine's capability set covers every one of them. A module with no `requires:` key
 # applies on every machine, including one that has not declared a role yet. Adding a role is

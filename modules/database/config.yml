@@ -10,3 +10,7 @@ homebrew_packages:
 # - PostgreSQL 14 for local development databases
 # - psql CLI client
 # - Version pinned at 14 for compatibility with existing projects
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - postgresql

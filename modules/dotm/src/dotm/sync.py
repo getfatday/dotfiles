@@ -10,7 +10,7 @@ import sys
 
 from rich.console import Console
 
-from dotm.config import get_dotfiles_repo, get_excluded_modules
+from dotm.config import get_dotfiles_repo, get_excluded_modules, get_platform
 from dotm.security import scan_changed_files, print_scan_results
 
 console = Console()
@@ -59,9 +59,10 @@ def ansible_apply(repo_path, excluded: list[str], quiet: bool = False) -> bool:
     # deploy.yml is the single place a profile turns into a module list: it resolves the
     # list from profiles.yml (base_modules plus the host's profile). dotm hands it no list,
     # because an explicit list on the command line overrides that resolution and makes
-    # profiles dead on the path machines actually use. The only extra var is this machine's
-    # excluded_modules from the dotm config, which the play subtracts last.
-    extra_vars = json.dumps({"dotm_excluded_modules": list(excluded)})
+    # profiles dead on the path machines actually use. The extra vars are this machine's own
+    # facts from the dotm config: excluded_modules, which the play subtracts last, and platform,
+    # the capability list that joins the role's for selection and gates each package manager.
+    extra_vars = json.dumps({"dotm_excluded_modules": list(excluded), "dotm_platform": get_platform()})
 
     inventory = repo_path / "playbooks" / "inventory"
     cmd = [

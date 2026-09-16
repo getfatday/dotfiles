@@ -30,3 +30,9 @@ mergeable_files:
 # - Editor productivity functions and scripts
 # - TypeScript, LSP, and web development support
 # - Custom themes and key bindings
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - emacs
+  - vim
+  - neovim

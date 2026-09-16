@@ -8,3 +8,4 @@ homebrew_casks:
 
 # Note: This module provides:
 # - Bartender menu bar icon manager and organizer
+requires: [macos]

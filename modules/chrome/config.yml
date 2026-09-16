@@ -16,3 +16,4 @@ stow_dirs:
 # - Integration with development workflows
 # - Web browsing and testing capabilities
 
+requires: [macos]

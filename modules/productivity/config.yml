@@ -26,3 +26,15 @@ mergeable_files:
 # Note: This module provides:
 # - Fuzzy finding with fzf
 # - Productivity aliases and functions
+
+# Debian/Ubuntu equivalents, installed where the platform provides apt.
+apt_packages:
+  - dos2unix
+  - fzf
+  - jq
+  - nginx
+  - rename
+  - rsync
+  - stow
+  - wget
+  - fd-find

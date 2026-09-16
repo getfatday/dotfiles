@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
+from dotm.config import DEFAULT_PLATFORM
 from dotm.modules import (
     create_module,
     list_all_modules,
@@ -142,18 +143,32 @@ def test_repo_profiles_define_the_three_roles_and_mixed_is_the_union():
     assert isinstance(data["base_modules"], list)
 
 
-def test_repo_has_no_module_with_requires_yet_so_every_machine_gets_base_modules():
-    """Landing contract: the grammar arrives with no module requiring anything, so a machine
-    with no role resolves exactly base_modules minus its exclusions, as before."""
+def test_repo_base_modules_require_at_most_the_macos_platform_and_every_mac_gets_them_all():
+    """Landing contract: the only requirement a base module carries is `macos`, and it carries it
+    only when every package it declares is a Homebrew cask, formula, tap or mas id. A Mac (the
+    default platform) therefore resolves base_modules minus its exclusions, as before; only a
+    machine that declares a non-macOS platform drops those modules."""
     data = yaml.safe_load(PROFILES_YML.read_text())
     base = data["base_modules"]
+    requiring = []
     for name in base:
         config = yaml.safe_load((MODULES_DIR / name / "config.yml").read_text()) or {}
-        assert "requires" not in config, f"{name} carries requires; add requirements one PR at a time"
-    caps = resolve_capabilities(None, [], data["role_capabilities"])
-    assert caps == set()
+        reqs = module_requires(config, name)
+        assert reqs in ([], ["macos"]), f"{name} requires {reqs}; add requirements one PR at a time"
+        if reqs:
+            requiring.append(name)
+            assert not config.get("apt_packages"), f"{name} requires macos but lists apt packages"
+            assert any(config.get(k) for k in ("homebrew_casks", "homebrew_packages", "homebrew_taps",
+                                               "mas_installed_apps")), f"{name} requires macos for nothing"
+    assert requiring, "expected the macOS-only modules to declare requires: [macos]"
     excluded = ["docker"]
     expected = sorted(set(base) - set(excluded))
-    assert select_modules([m for m in base if m not in excluded], caps, MODULES_DIR) == expected
-    for role in data["role_capabilities"]:
-        assert select_modules(base, resolve_capabilities(role, [], data["role_capabilities"]), MODULES_DIR) == sorted(set(base))
+    for role in [None, *data["role_capabilities"]]:
+        caps = resolve_capabilities(role, DEFAULT_PLATFORM, data["role_capabilities"])
+        assert select_modules([m for m in base if m not in excluded], caps, MODULES_DIR) == expected
+    # Without the platform joined, exactly the requiring modules drop: the counterfactual the
+    # deploy.yml join line exists to prevent.
+    assert select_modules(base, resolve_capabilities(None, [], data["role_capabilities"]), MODULES_DIR) \
+        == sorted(set(base) - set(requiring))
+    linux = resolve_capabilities("mixed", ["linux-arm", "apt", "headless"], data["role_capabilities"])
+    assert select_modules(base, linux, MODULES_DIR) == sorted(set(base) - set(requiring))

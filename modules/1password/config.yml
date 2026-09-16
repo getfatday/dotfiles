@@ -8,3 +8,4 @@ homebrew_casks:
 
 stow_dirs:
   - 1password
+requires: [macos]
