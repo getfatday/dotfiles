@@ -4,11 +4,20 @@
 # fixture: a throwaway VM that runs the one-fetch bootstrap and a second apply to prove a change
 # converges and stays idempotent.
 
-homebrew_taps:
-  - cirruslabs/cli
-
-homebrew_packages:
-  - tart
+# Installed from the signed GitHub release, pinned by tag and sha256, so no third-party Homebrew
+# tap is needed. The role caches the asset under ~/.local/share/dotm/releases/<repo>/<tag>/, verifies
+# the checksum before extracting, copies the .app into ~/Applications and links the binary into
+# ~/.local/bin; a stamp in the tag dir keeps a second run from changing anything.
+github_releases:
+  - repo: cirruslabs/tart
+    tag: "2.37.0"
+    asset: tart.tar.gz
+    sha256: d531752c4dad5d4214ac7ff540cefc2647df1fca2338d413d3c01754f54b356b
+    install:
+      app: tart.app
+      bin:
+        - tart.app/Contents/MacOS/tart
+    strip_components: 0
 
 # Selected only on a Mac that declares `virtualization-host` under `capabilities:` in its
 # ~/.config/dotm/config.yml. No role provides that capability, so every machine that does not
