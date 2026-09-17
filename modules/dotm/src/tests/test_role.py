@@ -143,26 +143,40 @@ def test_repo_profiles_define_the_three_roles_and_mixed_is_the_union():
     assert isinstance(data["base_modules"], list)
 
 
-def test_repo_base_modules_require_at_most_the_macos_platform_and_every_mac_gets_them_all():
-    """Landing contract: the only requirement a base module carries is `macos`, and it carries it
-    only when every package it declares is a Homebrew cask, formula, tap or mas id. A Mac (the
-    default platform) therefore resolves base_modules minus its exclusions, as before; only a
-    machine that declares a non-macOS platform drops those modules."""
+# Base modules whose requirements go beyond the platform, and the machine-declared capability
+# each one needs. Requirements are added one PR at a time; every addition extends this map.
+OPT_IN = {"tart": ["virtualization-host"]}
+
+
+def test_repo_base_modules_require_the_macos_platform_or_a_declared_capability():
+    """Landing contract: a base module requires nothing, `macos`, or `macos` plus a capability
+    profiles.yml lists under `declared_capabilities:` (named per module in OPT_IN). It carries
+    `macos` only when every package it declares is a Homebrew cask, formula, tap or mas id. A Mac
+    (the default platform) therefore resolves base_modules minus its exclusions minus the opt-in
+    modules, as before; only a machine that declares a non-macOS platform drops the rest."""
     data = yaml.safe_load(PROFILES_YML.read_text())
     base = data["base_modules"]
-    requiring = []
+    declared = data["declared_capabilities"]
+    requiring, opt_in = [], []
     for name in base:
         config = yaml.safe_load((MODULES_DIR / name / "config.yml").read_text()) or {}
         reqs = module_requires(config, name)
-        assert reqs in ([], ["macos"]), f"{name} requires {reqs}; add requirements one PR at a time"
+        allowed = ([], ["macos"], ["macos", *OPT_IN.get(name, [])])
+        assert reqs in allowed, f"{name} requires {reqs}; add requirements one PR at a time"
         if reqs:
             requiring.append(name)
             assert not config.get("apt_packages"), f"{name} requires macos but lists apt packages"
             assert any(config.get(k) for k in ("homebrew_casks", "homebrew_packages", "homebrew_taps",
                                                "mas_installed_apps")), f"{name} requires macos for nothing"
+        if name in OPT_IN:
+            opt_in.append(name)
+            assert reqs == ["macos", *OPT_IN[name]], f"{name} must require exactly {OPT_IN[name]}"
+            for cap in OPT_IN[name]:
+                assert cap in declared, f"{cap} is not listed under declared_capabilities"
     assert requiring, "expected the macOS-only modules to declare requires: [macos]"
+    assert sorted(opt_in) == sorted(OPT_IN), "every OPT_IN module is a base module"
     excluded = ["docker"]
-    expected = sorted(set(base) - set(excluded))
+    expected = sorted(set(base) - set(excluded) - set(opt_in))
     for role in [None, *data["role_capabilities"]]:
         caps = resolve_capabilities(role, DEFAULT_PLATFORM, data["role_capabilities"])
         assert select_modules([m for m in base if m not in excluded], caps, MODULES_DIR) == expected
@@ -172,3 +186,43 @@ def test_repo_base_modules_require_at_most_the_macos_platform_and_every_mac_gets
         == sorted(set(base) - set(requiring))
     linux = resolve_capabilities("mixed", ["linux-arm", "apt", "headless"], data["role_capabilities"])
     assert select_modules(base, linux, MODULES_DIR) == sorted(set(base) - set(requiring))
+
+
+def test_repo_tart_is_selected_only_where_virtualization_host_is_declared():
+    """The VM fixture: `tart` joins base_modules requiring `virtualization-host`, which no role
+    provides. A Mac that does not declare it resolves exactly the set it resolved before tart
+    landed; a Mac that declares it under `capabilities:` gains tart and nothing else."""
+    data = yaml.safe_load(PROFILES_YML.read_text())
+    roles = data["role_capabilities"]
+    base = data["base_modules"]
+    assert "tart" in base
+    assert module_requires(yaml.safe_load((MODULES_DIR / "tart" / "config.yml").read_text()), "tart") \
+        == ["macos", "virtualization-host"]
+    assert "virtualization-host" not in {c for caps in roles.values() for c in caps}
+    assert "virtualization-host" in data["declared_capabilities"]
+    before = sorted(set(base) - {"tart"})
+    for role in [None, *roles]:
+        without = select_modules(base, resolve_capabilities(role, DEFAULT_PLATFORM, roles), MODULES_DIR)
+        assert "tart" not in without
+        assert without == before, f"role {role}: a machine without the capability changed"
+        assert len(without) == len(base) - 1
+        with_cap = select_modules(base, resolve_capabilities(role, [*DEFAULT_PLATFORM, "virtualization-host"],
+                                                             roles), MODULES_DIR)
+        assert with_cap == sorted(base), f"role {role}: declaring the capability should add exactly tart"
+    # The capability alone is not enough off macOS: Tart is Apple Virtualization.
+    pi = resolve_capabilities("personal", ["linux-arm", "apt", "headless", "virtualization-host"], roles)
+    assert "tart" not in select_modules(base, pi, MODULES_DIR)
+
+
+def test_declared_capabilities_never_count_as_unprovided(tmp_path):
+    modules_dir = _tree(tmp_path)
+    _module(modules_dir, "vm-runner", {"homebrew_packages": ["vm"], "requires": ["macos", "virtualization-host"]})
+    _module(modules_dir, "orphan", {"requires": ["nothing-provides-this"]})
+    with patch("dotm.modules.get_role_capabilities", return_value=ROLES), \
+         patch("dotm.modules.get_declared_capability_names", return_value=["virtualization-host"]), \
+         patch("dotm.modules.get_modules_dir", return_value=modules_dir):
+        assert unprovided_requirements() == {"orphan": ["nothing-provides-this"]}
+    with patch("dotm.modules.get_role_capabilities", return_value=ROLES), \
+         patch("dotm.modules.get_declared_capability_names", return_value=[]), \
+         patch("dotm.modules.get_modules_dir", return_value=modules_dir):
+        assert unprovided_requirements()["vm-runner"] == ["virtualization-host"]

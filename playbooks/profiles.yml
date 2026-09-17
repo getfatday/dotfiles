@@ -30,6 +30,12 @@ role_capabilities:
     - work-login
     - personal-account
 
+# Capabilities a machine may declare directly under `capabilities:` in its local dotm config.
+# No role provides these; a machine opts in by name. Listing one here is documentation and
+# lets `dotm status` tell an opted-in capability from a requirement nothing can satisfy.
+declared_capabilities:
+  - virtualization-host   # runs Tart VMs; the fresh-machine fixture lives on this Mac
+
 # Base modules installed on ALL systems
 base_modules:
   - 1password
@@ -75,6 +81,7 @@ base_modules:
   - sesh
   - speckit
   - spotify
+  - tart
   - tmux
   - vscode
   - wireguard
