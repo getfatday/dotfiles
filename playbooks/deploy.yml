@@ -149,3 +149,63 @@
       environment:
         PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts.env.PATH }}"
       loop: "{{ mas_installed_apps | default([]) }}"
+
+    # Session host (T5 health): the machine that declares `session-host` under `capabilities:`
+    # is the fleet's always-addressable remote session host. It never idle-sleeps, wakes for
+    # network access, restarts after a power loss, keeps TCP sessions alive across the rare
+    # sleep, and has Remote Login on. These are system-wide settings that need root; there is
+    # no per-module task hook in the role, so they live here behind the same capability the
+    # session-host module requires. Every task checks first and mutates only on a miss, so a
+    # second run reports changed=0. Root comes from `sudo -A` with the dotm sudo-askpass helper
+    # (Ansible's own `become` passes `sudo -n`, which never consults SUDO_ASKPASS); the helper's
+    # allowlist admits exactly these pmset and systemsetup invocations.
+    #
+    # Minimal set: `sleep 0` alone stops idle sleep, which is the only way a headless Mac mini
+    # goes to sleep on its own (no lid, nobody at the Apple menu). `disablesleep` is left alone
+    # because it also blocks the owner from sleeping the host on purpose and shows up in
+    # System Settings as a greyed-out control; `displaysleep` is left alone because a dark
+    # display costs nothing on a headless host and keeps the login window from burning in.
+    - name: Read the current power settings on the session host
+      ansible.builtin.command:
+        argv: ["/usr/bin/pmset", "-g"]
+      register: session_host_pmset
+      changed_when: false
+      when: "'session-host' in dotm_capabilities"
+
+    - name: Assert the session host's power settings
+      ansible.builtin.command:
+        argv: ["/usr/bin/sudo", "-A", "/usr/bin/pmset", "-a", "{{ item.key }}", "{{ item.value }}"]
+      environment:
+        SUDO_ASKPASS: "{{ ansible_facts.env.HOME }}/.local/bin/sudo-askpass"
+      loop:
+        - { key: sleep, value: "0" }          # never idle-sleep
+        - { key: womp, value: "1" }           # wake on network access
+        - { key: autorestart, value: "1" }    # come back after a power loss
+        - { key: tcpkeepalive, value: "1" }   # keep ssh and Tailscale sessions alive
+      loop_control:
+        label: "{{ item.key }}={{ item.value }}"
+      when:
+        - "'session-host' in dotm_capabilities"
+        - >-
+          (session_host_pmset.stdout_lines
+           | map('trim') | select('match', '^' ~ item.key ~ '\s')
+           | map('regex_replace', '^' ~ item.key ~ '\s+(\S+).*$', '\1') | first | default('missing'))
+          != item.value
+
+    - name: Read whether Remote Login is on for the session host
+      ansible.builtin.command:
+        argv: ["/usr/bin/sudo", "-A", "/usr/sbin/systemsetup", "-getremotelogin"]
+      environment:
+        SUDO_ASKPASS: "{{ ansible_facts.env.HOME }}/.local/bin/sudo-askpass"
+      register: session_host_remotelogin
+      changed_when: false
+      when: "'session-host' in dotm_capabilities"
+
+    - name: Assert Remote Login is on for the session host
+      ansible.builtin.command:
+        argv: ["/usr/bin/sudo", "-A", "/usr/sbin/systemsetup", "-setremotelogin", "on"]
+      environment:
+        SUDO_ASKPASS: "{{ ansible_facts.env.HOME }}/.local/bin/sudo-askpass"
+      when:
+        - "'session-host' in dotm_capabilities"
+        - session_host_remotelogin.stdout is not search('Remote Login: On')

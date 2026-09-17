@@ -145,7 +145,7 @@ def test_repo_profiles_define_the_three_roles_and_mixed_is_the_union():
 
 # Base modules whose requirements go beyond the platform, and the machine-declared capability
 # each one needs. Requirements are added one PR at a time; every addition extends this map.
-OPT_IN = {"tart": ["virtualization-host"]}
+OPT_IN = {"tart": ["virtualization-host"], "session-host": ["session-host"]}
 
 
 def test_repo_base_modules_require_the_macos_platform_or_a_declared_capability():
@@ -200,15 +200,15 @@ def test_repo_tart_is_selected_only_where_virtualization_host_is_declared():
         == ["macos", "virtualization-host"]
     assert "virtualization-host" not in {c for caps in roles.values() for c in caps}
     assert "virtualization-host" in data["declared_capabilities"]
-    before = sorted(set(base) - {"tart"})
+    before = sorted(set(base) - set(OPT_IN))
     for role in [None, *roles]:
         without = select_modules(base, resolve_capabilities(role, DEFAULT_PLATFORM, roles), MODULES_DIR)
         assert "tart" not in without
         assert without == before, f"role {role}: a machine without the capability changed"
-        assert len(without) == len(base) - 1
+        assert len(without) == len(base) - len(OPT_IN)
         with_cap = select_modules(base, resolve_capabilities(role, [*DEFAULT_PLATFORM, "virtualization-host"],
                                                              roles), MODULES_DIR)
-        assert with_cap == sorted(base), f"role {role}: declaring the capability should add exactly tart"
+        assert with_cap == sorted(before + ["tart"]), f"role {role}: declaring the capability should add exactly tart"
     # The capability alone is not enough off macOS: Tart is Apple Virtualization.
     pi = resolve_capabilities("personal", ["linux-arm", "apt", "headless", "virtualization-host"], roles)
     assert "tart" not in select_modules(base, pi, MODULES_DIR)
@@ -226,3 +226,34 @@ def test_declared_capabilities_never_count_as_unprovided(tmp_path):
          patch("dotm.modules.get_declared_capability_names", return_value=[]), \
          patch("dotm.modules.get_modules_dir", return_value=modules_dir):
         assert unprovided_requirements()["vm-runner"] == ["virtualization-host"]
+
+
+def test_repo_session_host_is_selected_only_where_the_capability_is_declared():
+    """The remote session host: `session-host` joins base_modules requiring the capability of the
+    same name, which no role provides. A Mac that does not declare it resolves exactly the set it
+    resolved before this module landed; a Mac that declares it under `capabilities:` gains
+    session-host and nothing else. The deploy.yml post_tasks that set the power and Remote Login
+    state are gated on the same capability string, so the two halves cannot drift apart."""
+    data = yaml.safe_load(PROFILES_YML.read_text())
+    roles = data["role_capabilities"]
+    base = data["base_modules"]
+    assert "session-host" in base
+    config = yaml.safe_load((MODULES_DIR / "session-host" / "config.yml").read_text())
+    assert module_requires(config, "session-host") == ["macos", "session-host"]
+    assert "session-host" not in {c for caps in roles.values() for c in caps}
+    assert "session-host" in data["declared_capabilities"]
+    deploy = (PROFILES_YML.parent / "deploy.yml").read_text()
+    assert deploy.count("'session-host' in dotm_capabilities") >= 4
+    before = sorted(set(base) - set(OPT_IN))
+    for role in [None, *roles]:
+        without = select_modules(base, resolve_capabilities(role, DEFAULT_PLATFORM, roles), MODULES_DIR)
+        assert "session-host" not in without
+        assert without == before, f"role {role}: a machine without the capability changed"
+        assert len(without) == len(base) - len(OPT_IN)
+        with_cap = select_modules(base, resolve_capabilities(role, [*DEFAULT_PLATFORM, "session-host"], roles),
+                                  MODULES_DIR)
+        assert with_cap == sorted(before + ["session-host"]), \
+            f"role {role}: declaring the capability should add exactly session-host"
+    # Off macOS the capability alone selects nothing: pmset and systemsetup are macOS tools.
+    pi = resolve_capabilities("personal", ["linux-arm", "apt", "headless", "session-host"], roles)
+    assert "session-host" not in select_modules(base, pi, MODULES_DIR)
