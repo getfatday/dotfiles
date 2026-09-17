@@ -33,12 +33,17 @@ CAPABILITY_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 # from; a module key no capability unlocks is left alone, so a module with only Homebrew items
 # resolves to nothing on a machine without brew. A machine that declares no platform is a Mac
 # with Homebrew and a display, which is what every machine was before the key existed.
+# `github_releases` (a list of {repo, tag, asset, sha256, install, strip_components} entries, one
+# per pinned release the role downloads, verifies, extracts, links and stamps) needs no package
+# manager, so every platform unlocks it.
 PLATFORM_PACKAGE_KEYS: dict[str, tuple[str, ...]] = {
-    "brew": ("homebrew_taps", "homebrew_packages", "homebrew_casks"),
-    "macos": ("mas_installed_apps",),
-    "apt": ("apt_packages",),
+    "brew": ("homebrew_taps", "homebrew_packages", "homebrew_casks", "github_releases"),
+    "macos": ("mas_installed_apps", "github_releases"),
+    "apt": ("apt_packages", "github_releases"),
 }
-PACKAGE_KEYS: tuple[str, ...] = tuple(k for keys in PLATFORM_PACKAGE_KEYS.values() for k in keys)
+PACKAGE_KEYS: tuple[str, ...] = tuple(dict.fromkeys(k for keys in PLATFORM_PACKAGE_KEYS.values() for k in keys))
+# Keys whose items are mappings rather than names: deduplicated and ordered by their identity fields.
+MAPPING_LIST_KEYS: dict[str, tuple[str, ...]] = {"github_releases": ("repo", "tag", "asset")}
 PLATFORM_CAPABILITIES = frozenset({"macos", "brew", "gui", "linux-arm", "apt", "headless"})
 
 
@@ -164,6 +169,7 @@ def list_all_modules() -> list[dict]:
             "homebrew_taps": config.get("homebrew_taps", []),
             "mas_installed_apps": config.get("mas_installed_apps", []),
             "apt_packages": config.get("apt_packages", []),
+            "github_releases": config.get("github_releases", []),
             "stow_dirs": config.get("stow_dirs", []),
             "mergeable_files": config.get("mergeable_files", []),
             "requires": module_requires(config, mod_dir.name),
@@ -179,17 +185,27 @@ def resolve_packages(modules: list[dict], platform: list[str], report=None) -> d
     platform is reported through `report` (one line naming the module) when a callable is given.
     """
     caps = set(platform)
-    keys = [k for cap, cap_keys in PLATFORM_PACKAGE_KEYS.items() if cap in caps for k in cap_keys]
-    resolved: dict[str, set] = {k: set() for k in keys}
+    keys = list(dict.fromkeys(k for cap, cap_keys in PLATFORM_PACKAGE_KEYS.items() if cap in caps for k in cap_keys))
+    resolved: dict[str, list] = {k: [] for k in keys}
     for mod in modules:
         contributed = 0
         for k in keys:
             items = mod.get(k) or []
-            resolved[k].update(items)
+            resolved[k].extend(items)
             contributed += len(items)
         if contributed == 0 and report is not None:
             report(f"resolve: module '{mod['name']}' contributes no packages for platform [{', '.join(platform)}]")
-    return {k: sorted(v) for k, v in resolved.items()}
+    result: dict[str, list] = {}
+    for k, items in resolved.items():
+        if k in MAPPING_LIST_KEYS:
+            fields = MAPPING_LIST_KEYS[k]
+            by_identity: dict[tuple, dict] = {}
+            for entry in items:
+                by_identity.setdefault(tuple(str(entry.get(f, "")) for f in fields), entry)
+            result[k] = [by_identity[i] for i in sorted(by_identity)]
+        else:
+            result[k] = sorted(set(items))
+    return result
 
 
 def get_deploy_modules() -> list[str]:

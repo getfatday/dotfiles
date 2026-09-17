@@ -6,6 +6,8 @@ roles:
     # Pinned on purpose: every machine installs the same role revision.
     # To bump: pick the new sha from github.com/getfatday/ansible-role-dotmodules,
     # set it here, then `ansible-galaxy install -r requirements.yml --force`.
+    # The github_releases key in modules/tart needs the role's github_releases task set; this pin
+    # moves to that change's merge sha before this branch merges.
     version: a1f48ee314f24d48420b19d4832ca1fe547d8375
 
 collections:
