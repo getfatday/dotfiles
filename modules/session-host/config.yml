@@ -1,0 +1,25 @@
+---
+# Session-host module
+# The declared state of the machine that serves as the fleet's always-addressable remote
+# session host (today the Mac mini). A host that sleeps vanishes from ping, ARP, Bonjour and
+# ssh, and a wake-on-LAN packet does not reliably bring it back, so the host must never
+# idle-sleep and must come back on its own after a power loss.
+#
+# The power and Remote Login settings this module stands for are system-wide (pmset,
+# systemsetup) and need root, so they are not package keys: they live in the post_tasks block
+# of playbooks/deploy.yml that is gated on the same `session-host` capability this module
+# requires. Both halves are selected by the same declaration and neither applies without it.
+#
+# No packages. The subject addresses the host by its tailnet name (the ssh config the
+# 1password module ships, the cc-remote helper) but installs no tailnet client anywhere, so
+# none is added here; the lab's census reaches the host by its LAN address or mDNS name.
+#
+# Reachability: a session host on Wi-Fi drops off the LAN when the link drops, and a wake
+# packet cannot reach a Wi-Fi host. deploy.yml reports (never changes) the interface type
+# behind the default route and warns when it is Wi-Fi; the fix is an owner action (plug in
+# Ethernet, reserve the address at the router).
+
+# Selected only on a Mac that declares `session-host` under `capabilities:` in its
+# ~/.config/dotm/config.yml. No role provides that capability, so every machine that does not
+# declare it is unchanged by this module.
+requires: [macos, session-host]

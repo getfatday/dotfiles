@@ -3,6 +3,8 @@
 #
 # Provides the user's password when sudo is running an allowed command.
 # Allowed: Homebrew cask installs (pkg, app copies, permission changes).
+# Also: the session-host power and Remote Login settings deploy.yml asserts where that
+# capability is declared (exact pmset and systemsetup invocations, listed below).
 # Reads the password from macOS Keychain; prompts via osascript on first use.
 #
 # Setup: security add-generic-password -s "dotm-sudo" -a "$(whoami)" -w
@@ -22,6 +24,14 @@ case "$SUDO_CMD" in
     *"/bin/mkdir "*"/Applications/"*)allowed=true ;;  # create app dirs
     *"/bin/rm "*"/Applications/"*)   allowed=true ;;  # remove old app
     *"/usr/sbin/chown "*"/Applications/"*) allowed=true ;;  # fix ownership
+    # Session host (deploy.yml post_tasks, gated on the session-host capability): power
+    # settings and Remote Login. Exact invocations only; nothing else under pmset or systemsetup.
+    *"/usr/bin/pmset -a sleep 0")            allowed=true ;;
+    *"/usr/bin/pmset -a womp 1")             allowed=true ;;
+    *"/usr/bin/pmset -a autorestart 1")      allowed=true ;;
+    *"/usr/bin/pmset -a tcpkeepalive 1")     allowed=true ;;
+    *"/usr/sbin/systemsetup -getremotelogin") allowed=true ;;
+    *"/usr/sbin/systemsetup -setremotelogin on") allowed=true ;;
 esac
 
 if [ "$allowed" = false ]; then

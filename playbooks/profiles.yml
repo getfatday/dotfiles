@@ -35,6 +35,7 @@ role_capabilities:
 # lets `dotm status` tell an opted-in capability from a requirement nothing can satisfy.
 declared_capabilities:
   - virtualization-host   # runs Tart VMs; the fresh-machine fixture lives on this Mac
+  - session-host          # the always-addressable remote session host: never idle-sleeps, Remote Login on
 
 # Base modules installed on ALL systems
 base_modules:
@@ -79,6 +80,7 @@ base_modules:
   - security
   - sequel-ace
   - sesh
+  - session-host
   - speckit
   - spotify
   - tart

@@ -87,3 +87,42 @@ def test_verify_empty_module():
     mod = _make_module("empty")
     checks = verify_module(mod)
     assert checks == []
+
+
+PMSET_ON = """System-wide power settings:
+Currently in use:
+ standby              1
+ sleep                0
+ autorestart          1
+ tcpkeepalive         1
+ womp                 1
+"""
+
+
+def test_session_host_check_passes_on_declared_settings():
+    from dotm.verify import session_host_check
+    name, ok, detail = session_host_check(PMSET_ON)
+    assert (name, ok) == ("session_host", True)
+
+
+def test_session_host_check_names_each_miss():
+    from dotm.verify import session_host_check
+    output = PMSET_ON.replace(" sleep                0", " sleep                1 (sleep prevented by powerd)")
+    output = output.replace(" autorestart          1\n", "")
+    name, ok, detail = session_host_check(output)
+    assert not ok
+    assert "sleep=1 (want 0)" in detail
+    assert "autorestart=missing (want 1)" in detail
+    assert "womp" not in detail
+
+
+def test_session_host_doctor_runs_only_where_declared():
+    from dotm.verify import run_session_host_doctor
+    with patch("dotm.config.get_declared_capabilities", return_value=["virtualization-host"]):
+        assert run_session_host_doctor() == []
+    fake = type("R", (), {"returncode": 0, "stdout": PMSET_ON})()
+    with patch("dotm.config.get_declared_capabilities", return_value=["session-host"]), \
+         patch("dotm.verify.subprocess.run", return_value=fake) as run:
+        checks = run_session_host_doctor()
+    assert checks == [("session_host", True, "power settings as declared")]
+    assert run.call_args.args[0] == ["/usr/bin/pmset", "-g"]

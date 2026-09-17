@@ -185,7 +185,38 @@ def run_doctor() -> list[tuple[str, bool, str]]:
     checks.append(("secrets_scan", len(findings) == 0,
                     "clean" if not findings else f"{len(findings)} potential secret(s) found"))
 
+    # Session host power settings (only where the capability is declared)
+    checks.extend(run_session_host_doctor())
+
     return checks
+
+
+# The power settings deploy.yml asserts on a machine that declares the `session-host` capability
+# (playbooks/deploy.yml post_tasks; modules/session-host). Read-only here: `pmset -g` needs no root.
+SESSION_HOST_PMSET = {"sleep": "0", "womp": "1", "autorestart": "1", "tcpkeepalive": "1"}
+
+
+def session_host_check(pmset_output: str) -> tuple[str, bool, str]:
+    """Compare `pmset -g` output with the session host's declared power settings."""
+    current = {}
+    for line in pmset_output.splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            current.setdefault(parts[0], parts[1])
+    misses = [f"{k}={current.get(k, 'missing')} (want {v})" for k, v in SESSION_HOST_PMSET.items()
+              if current.get(k) != v]
+    return ("session_host", not misses, "power settings as declared" if not misses else ", ".join(misses))
+
+
+def run_session_host_doctor() -> list[tuple[str, bool, str]]:
+    """The session-host check, only where the machine declares that capability."""
+    from dotm.config import get_declared_capabilities
+    if "session-host" not in get_declared_capabilities():
+        return []
+    result = subprocess.run(["/usr/bin/pmset", "-g"], capture_output=True, text=True)
+    if result.returncode != 0:
+        return [("session_host", False, "pmset -g failed")]
+    return [session_host_check(result.stdout)]
 
 
 def print_doctor(checks: list[tuple[str, bool, str]]) -> bool:
