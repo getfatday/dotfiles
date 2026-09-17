@@ -9,7 +9,7 @@
 		<string>/bin/bash</string>
 		<string>-l</string>
 		<string>-c</string>
-		<string>export SUDO_ASKPASS="$HOME/.local/bin/sudo-askpass"; mkdir -p ~/.config/dotm/logs; L=~/.config/dotm/logs; W=~/.local/libexec/dotm-watchdog/watchdog.py; if [ -f ~/.config/dotm/watchdog.env ] &amp;&amp; [ -x "$W" ]; then set -a; . ~/.config/dotm/watchdog.env; set +a; "$W" ~/.local/bin/dotm sync --quiet >>"$L"/sync.log 2>>"$L"/sync.err.log; else ~/.local/bin/dotm sync --quiet >>"$L"/sync.log 2>>"$L"/sync.err.log; fi</string>
+		<string>export SUDO_ASKPASS="$HOME/.local/bin/sudo-askpass"; mkdir -p ~/.config/dotm/logs; L=~/.config/dotm/logs; W=~/.local/libexec/dotm-watchdog/watchdog.py; if [ -f ~/.config/dotm/watchdog.env ]; then set -a; . ~/.config/dotm/watchdog.env; set +a; fi; if [ -x "$W" ]; then "$W" ~/.local/bin/dotm sync --quiet >>"$L"/sync.log 2>>"$L"/sync.err.log; else ~/.local/bin/dotm sync --quiet >>"$L"/sync.log 2>>"$L"/sync.err.log; fi</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
