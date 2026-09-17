@@ -1,0 +1,16 @@
+---
+# Tart module
+# macOS and Linux VM runner on Apple Virtualization (cirruslabs/tart). It is the fresh-machine
+# fixture: a throwaway VM that runs the one-fetch bootstrap and a second apply to prove a change
+# converges and stays idempotent.
+
+homebrew_taps:
+  - cirruslabs/cli
+
+homebrew_packages:
+  - tart
+
+# Selected only on a Mac that declares `virtualization-host` under `capabilities:` in its
+# ~/.config/dotm/config.yml. No role provides that capability, so every machine that does not
+# declare it is unchanged by this module.
+requires: [macos, virtualization-host]

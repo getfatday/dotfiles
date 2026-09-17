@@ -73,6 +73,12 @@ def get_role_capabilities() -> dict[str, list[str]]:
     return {str(r): [str(c) for c in (caps or [])] for r, caps in roles.items()}
 
 
+def get_declared_capability_names() -> list[str]:
+    """Capabilities profiles.yml says a machine may declare directly (`declared_capabilities:`)."""
+    names = _load_profiles().get("declared_capabilities") or []
+    return [str(c) for c in names]
+
+
 def resolve_capabilities(role: str | None, declared: list[str] | None = None,
                          role_capabilities: dict[str, list[str]] | None = None) -> set[str]:
     """The capability set a machine has: what its role provides plus what it declares directly.
@@ -120,12 +126,14 @@ def select_modules(candidates: list[str], capabilities: set[str],
 
 
 def unprovided_requirements(modules: list[dict] | None = None) -> dict[str, list[str]]:
-    """Module -> capabilities it requires that no role in profiles.yml provides.
+    """Module -> capabilities it requires that nothing in profiles.yml provides.
 
-    Platform capabilities are provided by a machine's `platform:` list, not by a role, so they
-    never count as missing here.
+    Platform capabilities are provided by a machine's `platform:` list, and the names under
+    `declared_capabilities:` by a machine's own `capabilities:` list, not by a role, so neither
+    counts as missing here.
     """
-    provided = {c for caps in get_role_capabilities().values() for c in caps} | PLATFORM_CAPABILITIES
+    provided = ({c for caps in get_role_capabilities().values() for c in caps}
+                | PLATFORM_CAPABILITIES | set(get_declared_capability_names()))
     missing = {}
     for mod in modules if modules is not None else list_all_modules():
         gap = [c for c in mod.get("requires", []) if c not in provided]
@@ -400,7 +408,7 @@ def print_status() -> None:
     console.print(f"  Repo: {get_dotfiles_repo()}")
     console.print(f"  Role: {get_role() or 'none'}")
     for name, gap in sorted(unprovided_requirements(modules).items()):
-        console.print(f"  [yellow]{name} requires {', '.join(gap)}, which no role provides[/yellow]")
+        console.print(f"  [yellow]{name} requires {', '.join(gap)}, which nothing provides[/yellow]")
 
 
 def main(argv: list[str] | None = None) -> int:
