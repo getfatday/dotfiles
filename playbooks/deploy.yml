@@ -192,6 +192,44 @@
            | map('regex_replace', '^' ~ item.key ~ '\s+(\S+).*$', '\1') | first | default('missing'))
           != item.value
 
+    # Report only, never a change: which interface carries the default route and whether it is
+    # Wi-Fi. A session host on Wi-Fi vanishes from the LAN when the link drops (the outage that
+    # motivated this module) and a wake packet cannot reach it. The fix is an owner action.
+    - name: Read the interface behind the session host's default route
+      ansible.builtin.shell: |
+        set -o pipefail
+        /sbin/route -n get default 2>/dev/null | /usr/bin/awk '$1 == "interface:" {print $2}'
+      args:
+        executable: /bin/bash
+      register: session_host_route
+      changed_when: false
+      failed_when: false
+      when: "'session-host' in dotm_capabilities"
+
+    - name: Read the hardware port of that interface
+      ansible.builtin.shell: |
+        set -o pipefail
+        /usr/sbin/networksetup -listallhardwareports \
+          | /usr/bin/awk -v dev="{{ session_host_route.stdout | trim }}" \
+              '/^Hardware Port:/ {port = substr($0, 16)} /^Device:/ && $2 == dev {print port}'
+      args:
+        executable: /bin/bash
+      register: session_host_port
+      changed_when: false
+      failed_when: false
+      when:
+        - "'session-host' in dotm_capabilities"
+        - session_host_route.stdout | trim | length > 0
+
+    - name: Report the session host's uplink
+      ansible.builtin.debug:
+        msg: >-
+          session-host uplink: {{ session_host_route.stdout | default('', true) | trim | default('none', true) }}
+          ({{ session_host_port.stdout | default('', true) | trim | default('unknown port', true) }}).
+          {{ 'WARNING: the default route is Wi-Fi; a Wi-Fi session host drops off the LAN when the link drops and cannot be woken by a network packet. Owner action: plug in Ethernet and reserve the address at the router.'
+             if (session_host_port.stdout | default('', true)) is search('Wi-Fi') else 'wired or unknown; nothing to do.' }}
+      when: "'session-host' in dotm_capabilities"
+
     - name: Read whether Remote Login is on for the session host
       ansible.builtin.command:
         argv: ["/usr/bin/sudo", "-A", "/usr/sbin/systemsetup", "-getremotelogin"]

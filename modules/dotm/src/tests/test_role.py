@@ -166,8 +166,12 @@ def test_repo_base_modules_require_the_macos_platform_or_a_declared_capability()
         if reqs:
             requiring.append(name)
             assert not config.get("apt_packages"), f"{name} requires macos but lists apt packages"
-            assert any(config.get(k) for k in ("homebrew_casks", "homebrew_packages", "homebrew_taps",
-                                               "mas_installed_apps")), f"{name} requires macos for nothing"
+            # An opt-in module may carry no packages when its payload is a deploy.yml block gated
+            # on the same capability (session-host: pmset and systemsetup need root and are not
+            # package keys). Every other requiring module installs something.
+            assert name in OPT_IN or any(config.get(k) for k in ("homebrew_casks", "homebrew_packages",
+                                                                  "homebrew_taps", "mas_installed_apps")), \
+                f"{name} requires macos for nothing"
         if name in OPT_IN:
             opt_in.append(name)
             assert reqs == ["macos", *OPT_IN[name]], f"{name} must require exactly {OPT_IN[name]}"

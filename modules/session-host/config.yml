@@ -10,13 +10,14 @@
 # of playbooks/deploy.yml that is gated on the same `session-host` capability this module
 # requires. Both halves are selected by the same declaration and neither applies without it.
 #
-# Tailscale: the subject already addresses the mini by its tailnet name (see the ssh config
-# shipped by the 1password module and the cc-remote helper), so the host keeps the tailnet
-# client installed. `tailscale-app` is the GUI client cask (the `tailscale` formula is the
-# CLI only and does not run the system network extension).
-
-homebrew_casks:
-  - tailscale-app
+# No packages. The subject addresses the host by its tailnet name (the ssh config the
+# 1password module ships, the cc-remote helper) but installs no tailnet client anywhere, so
+# none is added here; the lab's census reaches the host by its LAN address or mDNS name.
+#
+# Reachability: a session host on Wi-Fi drops off the LAN when the link drops, and a wake
+# packet cannot reach a Wi-Fi host. deploy.yml reports (never changes) the interface type
+# behind the default route and warns when it is Wi-Fi; the fix is an owner action (plug in
+# Ethernet, reserve the address at the router).
 
 # Selected only on a Mac that declares `session-host` under `capabilities:` in its
 # ~/.config/dotm/config.yml. No role provides that capability, so every machine that does not
