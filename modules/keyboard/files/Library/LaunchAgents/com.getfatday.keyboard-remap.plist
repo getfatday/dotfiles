@@ -8,16 +8,18 @@
 	<array>
 		<string>/bin/sh</string>
 		<string>-c</string>
-		<!-- Caps Lock <-> Control swap, applied per-device to Apple keyboards only.
-		     Never set the system-level UserKeyMapping: macOS stamps it onto every
-		     newly attached keyboard and it overrides the per-device ByHost prefs,
-		     so HHKB-layout boards (which already send Control from the caps
-		     position) would get Control turned into Caps Lock. Attach-time
-		     behaviour comes from the ByHost prefs
-		     com.apple.keyboard.modifiermapping.VID-PID-0: 0-0-0 holds the swap for
-		     all keyboards (written by System Settings); identity entries exempt
-		     the PFU HHKB (1278-33-0) and the QMK tokyo60 (65261-24672-0). -->
-		<string>/usr/bin/hidutil property --set '{"UserKeyMapping":[]}' ; SWAP='{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x7000000E0},{"HIDKeyboardModifierMappingSrc":0x7000000E0,"HIDKeyboardModifierMappingDst":0x700000039},{"HIDKeyboardModifierMappingSrc":0x7000000E4,"HIDKeyboardModifierMappingDst":0x700000039}]}' ; /usr/bin/hidutil property --matching '{"Product":"Apple Internal Keyboard / Trackpad"}' --set "$SWAP" ; /usr/bin/hidutil property --matching '{"VendorID":1420}' --set "$SWAP" ; for kb in 1278-33-0 65261-24672-0; do /usr/bin/defaults -currentHost write -g com.apple.keyboard.modifiermapping.$kb -array "&lt;dict&gt;&lt;key&gt;HIDKeyboardModifierMappingSrc&lt;/key&gt;&lt;integer&gt;30064771129&lt;/integer&gt;&lt;key&gt;HIDKeyboardModifierMappingDst&lt;/key&gt;&lt;integer&gt;30064771129&lt;/integer&gt;&lt;/dict&gt;" "&lt;dict&gt;&lt;key&gt;HIDKeyboardModifierMappingSrc&lt;/key&gt;&lt;integer&gt;30064771296&lt;/integer&gt;&lt;key&gt;HIDKeyboardModifierMappingDst&lt;/key&gt;&lt;integer&gt;30064771296&lt;/integer&gt;&lt;/dict&gt;" "&lt;dict&gt;&lt;key&gt;HIDKeyboardModifierMappingSrc&lt;/key&gt;&lt;integer&gt;30064771300&lt;/integer&gt;&lt;key&gt;HIDKeyboardModifierMappingDst&lt;/key&gt;&lt;integer&gt;30064771300&lt;/integer&gt;&lt;/dict&gt;"; done</string>
+		<!-- One-directional Caps Lock -> Control remap, applied system-wide.
+		     Earlier versions also remapped physical Control keys to send the
+		     literal Caps Lock HID usage (0x39), intending a cosmetic swap; that
+		     usage is not cosmetic, it drives macOS real persistent caps-lock
+		     lock state, so every Control shortcut silently toggled system caps
+		     lock, eventually leaving it stuck on with no key able to turn it
+		     back off. Dropped that direction entirely. A system-wide (no
+		     --matching) mapping of Caps Lock -> Control is safe for every
+		     keyboard including HHKB-layout boards (tokyo60, PFU HHKB): they
+		     have no physical Caps Lock key, so the rule is a no-op on them and
+		     needs no per-device exemption. -->
+		<string>/usr/bin/hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x7000000E0}]}'</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
