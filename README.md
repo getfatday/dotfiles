@@ -114,6 +114,13 @@ Each module's `config.yml` file defines:
 - **Stow directories** for dotfile deployment
 - **Mac App Store apps** to install
 - **apt packages** (`apt_packages`) to install where the machine's platform provides apt
+- **GitHub releases** (`github_releases`): tools installed from a release asset pinned by tag and
+  sha256 instead of a third-party Homebrew tap. Each entry names `repo`, `tag`, `asset`, `sha256`,
+  `install: {app: <name.app>, bin: [<path in the tree>]}` and an optional `strip_components`. The
+  role caches the asset under `~/.local/share/dotm/releases/<repo>/<tag>/`, verifies the checksum
+  before anything is extracted, copies the `.app` into `~/Applications`, links the binaries into
+  `~/.local/bin` and stamps the tag directory so a second run changes nothing. Every platform
+  unlocks the key. See `modules/tart/config.yml` for an example.
 - **Requirements** (`requires`): capabilities the machine must have for the module to apply;
   a module whose packages are all Homebrew or Mac App Store items declares `requires: [macos]`
 
@@ -121,7 +128,8 @@ Each machine declares its role and platform in `~/.config/dotm/config.yml`. The 
 capability list (`platform: [macos, brew, gui]` for a Mac, `platform: [linux-arm, apt, headless]`
 for a Raspberry Pi; unset means the Mac list). It joins the role's capabilities when modules are
 selected and decides which package keys are installed: `brew` unlocks the `homebrew_*` keys,
-`macos` unlocks `mas_installed_apps`, `apt` unlocks `apt_packages`. Preview the per-manager
+`macos` unlocks `mas_installed_apps`, `apt` unlocks `apt_packages`, and `github_releases` is read on
+every platform. Preview the per-manager
 lists with `python -m dotm.modules resolve [--platform linux-arm,apt,headless]`.
 
 Example `config.yml`:

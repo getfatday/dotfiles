@@ -170,7 +170,8 @@ def test_repo_base_modules_require_the_macos_platform_or_a_declared_capability()
             # on the same capability (session-host: pmset and systemsetup need root and are not
             # package keys). Every other requiring module installs something.
             assert name in OPT_IN or any(config.get(k) for k in ("homebrew_casks", "homebrew_packages",
-                                                                  "homebrew_taps", "mas_installed_apps")), \
+                                                                  "homebrew_taps", "mas_installed_apps",
+                                                                  "github_releases")), \
                 f"{name} requires macos for nothing"
         if name in OPT_IN:
             opt_in.append(name)
