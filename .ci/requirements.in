@@ -1,0 +1,6 @@
+# CI-only toolchain; production dependencies remain governed by dotm/uv.lock.
+ansible-core==2.19.3
+click==8.3.0
+PyYAML==6.0.3
+rich==14.2.0
+pytest==8.4.2
