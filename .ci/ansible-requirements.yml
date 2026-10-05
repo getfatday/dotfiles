@@ -1,0 +1,10 @@
+---
+roles:
+  - name: ansible-role-dotmodules
+    src: git+https://github.com/getfatday/ansible-role-dotmodules.git
+    version: 28cdf7a7d58ccd1b9b985d09a5d4387f120bc412
+collections:
+  - name: geerlingguy.mac
+    version: 5.0.0
+  - name: community.general
+    version: 11.4.0

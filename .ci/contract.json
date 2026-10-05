@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "policy_version": "dotm-verification-v1",
+  "repository": "getfatday/dotfiles",
+  "required_profiles": ["fast", "macos-fixture", "linux-arm-fixture"],
+  "profiles": {
+    "fast": {
+      "system": "any",
+      "checks": [
+        ["{python}", ".ci/static_check.py"],
+        ["{python}", "-m", "pytest", "-q", "-p", "no:cacheprovider", "modules/dotm/src/tests", ".ci/tests"]
+      ]
+    },
+    "macos-fixture": {
+      "system": "Darwin",
+      "checks": [["{python}", ".ci/platform_fixture.py", "macos"]]
+    },
+    "linux-arm-fixture": {
+      "system": "Linux",
+      "architecture": ["aarch64", "arm64"],
+      "checks": [
+        ["{python}", "-m", "pytest", "-q", "-p", "no:cacheprovider", "modules/dotm/src/tests/test_platform.py", "modules/dotm/src/tests/test_role.py"],
+        ["{python}", ".ci/platform_fixture.py", "linux-arm"]
+      ]
+    }
+  },
+  "command_timeout_seconds": 300,
+  "receipt_max_age_seconds": 7200,
+  "baseline_exceptions": [],
+  "deployment_authorized": false
+}

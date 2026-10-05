@@ -67,13 +67,9 @@ def test_list_module_fields(tmp_path):
 
 
 def test_get_deploy_modules(tmp_path):
-    deploy_yml = tmp_path / "playbooks" / "deploy.yml"
-    deploy_yml.parent.mkdir(parents=True)
-    deploy_yml.write_text(yaml.dump([{
-        "name": "Deploy",
-        "hosts": "localhost",
-        "vars": {"dotmodules": {"install": ["git", "zsh", "node"]}},
-    }]))
+    profiles_yml = tmp_path / "playbooks" / "profiles.yml"
+    profiles_yml.parent.mkdir(parents=True)
+    profiles_yml.write_text(yaml.dump({"base_modules": ["git", "zsh", "node"]}))
 
     with patch("dotm.modules.get_dotfiles_repo", return_value=tmp_path):
         result = get_deploy_modules()
@@ -81,13 +77,9 @@ def test_get_deploy_modules(tmp_path):
 
 
 def test_is_module_installed(tmp_path):
-    deploy_yml = tmp_path / "playbooks" / "deploy.yml"
-    deploy_yml.parent.mkdir(parents=True)
-    deploy_yml.write_text(yaml.dump([{
-        "name": "Deploy",
-        "hosts": "localhost",
-        "vars": {"dotmodules": {"install": ["git", "zsh"]}},
-    }]))
+    profiles_yml = tmp_path / "playbooks" / "profiles.yml"
+    profiles_yml.parent.mkdir(parents=True)
+    profiles_yml.write_text(yaml.dump({"base_modules": ["git", "zsh"]}))
 
     with patch("dotm.modules.get_dotfiles_repo", return_value=tmp_path):
         assert is_module_installed("git") is True
@@ -128,3 +120,16 @@ def test_create_module_already_exists(tmp_path):
             assert False, "Should have raised FileExistsError"
         except FileExistsError:
             pass
+
+
+def test_deploy_module_selection_uses_profiles_not_legacy_playbook(tmp_path):
+    playbooks = tmp_path / "playbooks"
+    playbooks.mkdir()
+    (playbooks / "profiles.yml").write_text(yaml.dump({"base_modules": ["current"]}))
+    (playbooks / "deploy.yml").write_text(yaml.dump([{
+        "vars": {"dotmodules": {"install": ["obsolete"]}}
+    }]))
+    with patch("dotm.modules.get_dotfiles_repo", return_value=tmp_path):
+        assert get_deploy_modules() == ["current"]
+        assert is_module_installed("current") is True
+        assert is_module_installed("obsolete") is False
