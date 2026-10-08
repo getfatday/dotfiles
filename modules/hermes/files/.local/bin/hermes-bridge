@@ -22,17 +22,19 @@ case "$verb" in
   status)
     jq -n --arg v "$("$HERMES" --version 2>/dev/null | head -1)" --arg cfg "$("$HERMES" config get approvals.mode 2>/dev/null | tail -1)" \
       '{ok:true,version:$v,approvals_mode:$cfg}';;
-  ask)      # hermes-bridge ask [--resume ID] [--toolsets T] [--model M] [--extra "FLAGS"] -- PROMPT (or stdin)
-    resume=""; toolsets=""; extra=""
+  ask)      # hermes-bridge ask [--resume ID] [--toolsets T] [--model M] [--extra "FLAGS"] [--arg VALUE]... -- PROMPT (or stdin)
+    # --extra is split on whitespace (no globbing): simple flags only. --arg appends exactly one
+    # argv element, for values with spaces, quotes or parentheses. Both keep the order given.
+    resume=""; toolsets=""; pass=()
     while [ $# -gt 0 ]; do case "$1" in
       --resume) resume="$2"; shift 2;; --toolsets) toolsets="$2"; shift 2;;
-      --model) MODEL="$2"; shift 2;; --extra) extra="$2"; shift 2;; --) shift; break;; *) break;; esac; done
+      --model) MODEL="$2"; shift 2;; --extra) read -r -a w <<< "$2"; pass+=(${w[@]+"${w[@]}"}); shift 2;;
+      --arg) pass+=("$2"); shift 2;; --) shift; break;; *) break;; esac; done
     if [ $# -gt 0 ]; then printf '%s' "$*" > "$TMP/q"; else cat > "$TMP/q"; fi
     args=(-z "$(cat "$TMP/q")" --usage-file "$TMP/u.json")
     [ -n "$MODEL" ] && args+=(-m "$MODEL"); [ -n "$PROVIDER" ] && args+=(--provider "$PROVIDER")
     [ -n "$toolsets" ] && args+=(-t "$toolsets"); [ -n "$resume" ] && args+=(--resume "$resume")
-    # shellcheck disable=SC2206
-    [ -n "$extra" ] && args+=($extra)
+    args+=(${pass[@]+"${pass[@]}"})   # guard keeps bash 3.2 + set -u happy when empty
     out="$("$HERMES" "${args[@]}" 2>"$TMP/err")"; rc=$?
     if [ $rc -ne 0 ] || [ ! -s "$TMP/u.json" ] || [ "$(jq -r '.failed // false' "$TMP/u.json" 2>/dev/null)" = "true" ]; then
       jq -n --arg o "$out" --arg e "$(head -c 400 "$TMP/err")" --argjson rc "$rc" '{ok:false,rc:$rc,error:($o+" "+$e)}'; exit 1; fi
@@ -42,5 +44,5 @@ case "$verb" in
   doctor)
     jq -n --argjson st "$("$0" status)" --arg skills "$("$HERMES" skills list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -c 'enabled')" \
       '{ok:true,status:$st,enabled_skills:($skills|tonumber),policy:"pass-through"}';;
-  *) echo 'usage: hermes-bridge {status|ask [--resume ID] [--toolsets T] [--model M] [--extra FLAGS] [--] PROMPT|sessions|doctor}' >&2; exit 2;;
+  *) echo 'usage: hermes-bridge {status|ask [--resume ID] [--toolsets T] [--model M] [--extra FLAGS] [--arg VALUE]... [--] PROMPT|sessions|doctor}' >&2; exit 2;;
 esac

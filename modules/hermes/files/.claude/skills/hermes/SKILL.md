@@ -17,6 +17,7 @@ hermes-bridge ask -- "PROMPT"                          # one-shot, returns {ok,r
 hermes-bridge ask --resume SESSION_ID -- "FOLLOW-UP"   # continue the same Hermes session
 hermes-bridge ask --toolsets terminal,file -- "..."    # pick toolsets (default: Hermes' configured set)
 hermes-bridge ask --extra "--max-turns 5" -- "..."     # pass any other hermes flag through
+hermes-bridge ask --arg --flag --arg "value with spaces (ok)" -- "..."   # one argv element per --arg, nothing split
 hermes-bridge sessions                                 # list Hermes sessions
 ```
 Keep the `session_id` from `ask` and pass it to `--resume` for multi-turn work. Hermes holds that context, so it survives your own compaction.
