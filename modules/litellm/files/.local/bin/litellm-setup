@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# litellm-setup: idempotently install and start the local LiteLLM proxy.
+#   - uv tool install litellm[proxy]==$PIN (pinned; 1.82.7/1.82.8 were compromised)
+#   - ~/.config/litellm/env (600): LITELLM_MASTER_KEY generated once; ANTHROPIC_API_KEY copied
+#     from ~/.hermes/.env if missing there (value never printed)
+#   - ~/Library/LaunchAgents/com.getfatday.litellm.plist written for this $HOME and (re)loaded
+# Usage: litellm-setup [--check]
+set -euo pipefail
+PIN="1.104.2"
+UV=/opt/homebrew/bin/uv
+D="$HOME/.config/litellm"; ENVF="$D/env"
+LABEL=com.getfatday.litellm
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+check=0; [ "${1:-}" = "--check" ] && check=1
+say() { printf '%-10s %s\n' "$1" "$2"; }
+rc=0
+
+have="$("$UV" tool list 2>/dev/null | awk '/^litellm /{print $2}')"
+if [ "$have" = "v$PIN" ]; then say ok "litellm $have"
+elif [ $check = 1 ]; then say missing "litellm v$PIN (have: ${have:-none})"; rc=1
+else "$UV" tool install --force "litellm[proxy]==$PIN" >/dev/null; say installed "litellm v$PIN"; fi
+
+mkdir -p "$D/conf.d"
+if [ $check = 0 ]; then
+  touch "$ENVF"; chmod 600 "$ENVF"
+  grep -qE '^LITELLM_MASTER_KEY=.+' "$ENVF" || { printf 'LITELLM_MASTER_KEY=sk-litellm-%s\n' "$(openssl rand -hex 24)" >> "$ENVF"; say created "master key"; }
+  # Only a Console API key (sk-ant-api...) works here. A Claude subscription OAuth token
+  # (sk-ant-oat..., what Hermes often holds under the same name) is rejected by the API.
+  if ! grep -qE '^ANTHROPIC_API_KEY=sk-ant-api' "$ENVF" && grep -qE '^ANTHROPIC_API_KEY=sk-ant-api' "$HOME/.hermes/.env" 2>/dev/null; then
+    grep -E '^ANTHROPIC_API_KEY=sk-ant-api' "$HOME/.hermes/.env" | head -1 >> "$ENVF"; say copied "ANTHROPIC_API_KEY from ~/.hermes/.env"
+  fi
+fi
+grep -qE '^LITELLM_MASTER_KEY=.+' "$ENVF" 2>/dev/null && say ok "env LITELLM_MASTER_KEY" || { say missing "env LITELLM_MASTER_KEY"; rc=1; }
+if grep -qE '^ANTHROPIC_API_KEY=sk-ant-api' "$ENVF" 2>/dev/null; then say ok "env ANTHROPIC_API_KEY (console key)"
+else say missing "ANTHROPIC_API_KEY console key (sk-ant-api...) in $ENVF; Anthropic groups will fail"; rc=1; fi
+
+want="$(cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$LABEL</string>
+  <key>ProgramArguments</key><array><string>$HOME/.local/libexec/litellm/run</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/litellm.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/litellm.log</string>
+</dict></plist>
+EOF
+)"
+if [ -f "$PLIST" ] && [ "$(cat "$PLIST")" = "$want" ]; then say ok "LaunchAgent plist"
+elif [ $check = 1 ]; then say missing "LaunchAgent plist"; rc=1
+else mkdir -p "$(dirname "$PLIST")"; printf '%s\n' "$want" > "$PLIST"; say wrote "$PLIST"
+  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true; fi
+
+if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then say ok "agent loaded"
+elif [ $check = 1 ]; then say missing "agent not loaded"; rc=1
+else launchctl bootstrap "gui/$(id -u)" "$PLIST"; say loaded "$LABEL"; fi
+exit $rc

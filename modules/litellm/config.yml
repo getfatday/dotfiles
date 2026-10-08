@@ -1,0 +1,32 @@
+---
+# LiteLLM module
+# A local LiteLLM proxy on 127.0.0.1:4000: one OpenAI-compatible endpoint that maps stable
+# model GROUP names (deep, research, worker, cheap) to concrete models. Hermes agents name a
+# group, never a model, so swapping or adding models (Anthropic, on-prem, home Ollama, local)
+# is a LiteLLM config change, not an agent rebuild.
+#
+#   ~/.config/litellm/config.yaml      stowed base: the groups, Anthropic-backed
+#   ~/.config/litellm/conf.d/*.yaml    machine-local additions (e.g. the Mini's Ollama models),
+#                                      merged at start; never committed
+#   ~/.config/litellm/env              machine-local secrets (LITELLM_MASTER_KEY, provider keys),
+#                                      chmod 600; written by litellm-setup, never committed
+#   litellm-setup [--check]            installs the pinned litellm, writes env + LaunchAgent, loads it
+#   litellm-check [--live] [--json]    health: installed, agent loaded, port, auth'd /v1/models;
+#                                      --live adds one cheap completion
+#
+# Bound to 127.0.0.1 only. Work data must not be routed to a home model: a group that a
+# machine-local conf.d file points at a non-approved model must not be used by work agents.
+# Relies on: homebrew uv (productivity). litellm is pinned: 1.82.7/1.82.8 were compromised.
+
+# Selected only on a Mac that declares `llm-proxy-host` under `capabilities:` in its
+# ~/.config/dotm/config.yml. No role provides it.
+requires: [macos, llm-proxy-host]
+
+homebrew_packages:
+  - uv
+
+stow_dirs:
+  - litellm
+
+# Note: after apply run once:
+#   litellm-setup && litellm-check --live

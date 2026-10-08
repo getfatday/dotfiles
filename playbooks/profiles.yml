@@ -37,6 +37,7 @@ declared_capabilities:
   - virtualization-host   # runs Tart VMs; the fresh-machine fixture lives on this Mac
   - session-host          # the always-addressable remote session host: never idle-sleeps, Remote Login on
   - hermes-host           # runs the Hermes Agent <-> Claude Code bridge (module hermes)
+  - llm-proxy-host        # runs the local LiteLLM proxy on 127.0.0.1:4000 (module litellm)
 
 # Base modules installed on ALL systems
 base_modules:
@@ -68,6 +69,7 @@ base_modules:
   - gws
   - handbrake
   - hermes
+  - litellm
   - iterm
   - keepingyouawake
   - keyboard

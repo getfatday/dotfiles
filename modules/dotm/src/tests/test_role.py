@@ -145,7 +145,8 @@ def test_repo_profiles_define_the_three_roles_and_mixed_is_the_union():
 
 # Base modules whose requirements go beyond the platform, and the machine-declared capability
 # each one needs. Requirements are added one PR at a time; every addition extends this map.
-OPT_IN = {"tart": ["virtualization-host"], "session-host": ["session-host"], "hermes": ["hermes-host"]}
+OPT_IN = {"tart": ["virtualization-host"], "session-host": ["session-host"], "hermes": ["hermes-host"],
+          "litellm": ["llm-proxy-host"]}
 
 
 def test_repo_base_modules_require_the_macos_platform_or_a_declared_capability():
@@ -285,3 +286,26 @@ def test_repo_hermes_is_selected_only_where_hermes_host_is_declared():
                                   MODULES_DIR)
         assert with_cap == sorted(before + ["hermes"]), \
             f"role {role}: declaring the capability should add exactly hermes"
+
+
+def test_repo_litellm_is_selected_only_where_llm_proxy_host_is_declared():
+    """The local LiteLLM proxy: `litellm` joins base_modules requiring `llm-proxy-host`, which no
+    role provides. A Mac that does not declare it resolves exactly the set it resolved before; a
+    Mac that declares it under `capabilities:` gains litellm and nothing else."""
+    data = yaml.safe_load(PROFILES_YML.read_text())
+    roles = data["role_capabilities"]
+    base = data["base_modules"]
+    assert "litellm" in base
+    config = yaml.safe_load((MODULES_DIR / "litellm" / "config.yml").read_text())
+    assert module_requires(config, "litellm") == ["macos", "llm-proxy-host"]
+    assert "llm-proxy-host" not in {c for caps in roles.values() for c in caps}
+    assert "llm-proxy-host" in data["declared_capabilities"]
+    before = sorted(set(base) - set(OPT_IN))
+    for role in [None, *roles]:
+        without = select_modules(base, resolve_capabilities(role, DEFAULT_PLATFORM, roles), MODULES_DIR)
+        assert "litellm" not in without
+        assert without == before, f"role {role}: a machine without the capability changed"
+        with_cap = select_modules(base, resolve_capabilities(role, [*DEFAULT_PLATFORM, "llm-proxy-host"], roles),
+                                  MODULES_DIR)
+        assert with_cap == sorted(before + ["litellm"]), \
+            f"role {role}: declaring the capability should add exactly litellm"
