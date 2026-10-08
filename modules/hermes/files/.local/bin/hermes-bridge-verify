@@ -15,9 +15,9 @@ t "A7 Hermes sees claude-code-bridge skill"     "[ -n \"\$(hermes skills list 2>
 # A8 follows symlinks (find -L): after dotm apply every file here is a link into ~/.dotmodules.
 t "A8 no secret values in module files"         "! find -L $HOME/.claude/skills/hermes $HOME/.local/share/hermes-bridge/hermes-skills $H/hermes-bridge $H/claude-bridge $H/hermes-bridge-setup -type f -exec grep -EIl 'sk-ant-|oat01|ANTHROPIC_API_KEY=.' {} + | grep -q ."
 if [ $live -eq 1 ]; then
-  s=$(hermes-bridge ask -- 'Remember codeword ALPHA-1. Reply with exactly: STORED' | jq -r .session_id)
-  t "L1 Claude->Hermes ask then resume recalls context" "hermes-bridge ask --resume $s -- 'Codeword only.' | jq -e '.result|test(\"ALPHA-1\")'"
-  c=$(claude-bridge ask --model claude-haiku-5-5 -- 'Remember codeword BETA-2. Reply with exactly: STORED' | jq -r .session_id)
-  t "L2 Hermes->Claude ask then resume recalls context" "claude-bridge ask --model claude-haiku-5-5 --resume $c -- 'Codeword only.' | jq -e '.result|test(\"BETA-2\")'"
+  s=$(hermes-bridge ask -- 'Remember this word: ALPHA-1. Reply with exactly: STORED' | jq -r .session_id)
+  t "L1 Claude->Hermes ask then resume recalls context" "hermes-bridge ask --resume $s -- 'What was the word I gave you in my first message? Reply with only that word.' | jq -e '.result|test(\"ALPHA-1\")'"
+  c=$(claude-bridge ask --model claude-haiku-5-5 -- 'Remember this word: BETA-2. Reply with exactly: STORED' | jq -r .session_id)
+  t "L2 Hermes->Claude ask then resume recalls context" "claude-bridge ask --model claude-haiku-5-5 --resume $c -- 'What was the word I gave you in my first message? Reply with only that word.' | jq -e '.result|test(\"BETA-2\")'"
 fi
 echo "RESULT pass=$pass fail=$fail"; [ $fail -eq 0 ]
