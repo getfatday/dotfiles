@@ -7,6 +7,9 @@
 # Usage: litellm-setup [--check]
 set -euo pipefail
 PIN="1.104.2"
+# Prisma (DB client) is not in the [proxy] extra. 0.15.0 is the version verified with this pin;
+# Python 3.13 because the proxy's DB client fails to connect under 3.14.
+PRISMA_PIN="0.15.0"; PYVER="3.13"
 UV=/opt/homebrew/bin/uv
 D="$HOME/.config/litellm"; ENVF="$D/env"
 LABEL=com.getfatday.litellm
@@ -15,12 +18,33 @@ check=0; [ "${1:-}" = "--check" ] && check=1
 say() { printf '%-10s %s\n' "$1" "$2"; }
 rc=0
 
-have="$("$UV" tool list 2>/dev/null | awk '/^litellm /{print $2}')"
-if [ "$have" = "v$PIN" ]; then say ok "litellm $have"
-elif [ $check = 1 ]; then say missing "litellm v$PIN (have: ${have:-none})"; rc=1
-else "$UV" tool install --force "litellm[proxy]==$PIN" >/dev/null; say installed "litellm v$PIN"; fi
+cd "$HOME"   # a reinstall deletes the tool dir; never run from inside it
+TOOL="$("$UV" tool dir)/litellm"
+tool_ok() {
+  [ -x "$TOOL/bin/python" ] || return 1
+  "$TOOL/bin/python" - "$PIN" "$PRISMA_PIN" "$PYVER" <<'PY' 2>/dev/null
+import importlib.metadata as m, sys
+pin, ppin, pyver = sys.argv[1:4]
+ok = m.version("litellm") == pin and m.version("prisma") == ppin and sys.version.startswith(pyver + ".")
+import prisma, os  # generated client present?
+ok = ok and os.path.exists(os.path.join(os.path.dirname(prisma.__file__), "client.py"))
+sys.exit(0 if ok else 1)
+PY
+}
+if tool_ok; then say ok "litellm v$PIN + prisma $PRISMA_PIN (py$PYVER, client generated)"
+elif [ $check = 1 ]; then say missing "litellm v$PIN + prisma $PRISMA_PIN on py$PYVER"; rc=1
+else
+  "$UV" tool uninstall litellm >/dev/null 2>&1 || true
+  "$UV" tool install --python "$PYVER" "litellm[proxy]==$PIN" --with "prisma==$PRISMA_PIN" >/dev/null
+  schema="$(ls -d "$TOOL"/lib/python3.*/site-packages/litellm/proxy)/schema.prisma"
+  ( cd "$(dirname "$schema")" && PATH="$TOOL/bin:$PATH" "$TOOL/bin/prisma" generate --schema schema.prisma >/dev/null )
+  say installed "litellm v$PIN + prisma $PRISMA_PIN (py$PYVER), client generated"
+fi
 
 mkdir -p "$D/conf.d"
+
+# Database first: the proxy refuses to start without DATABASE_URL reachable.
+"$(dirname "$0")/litellm-db" setup $([ $check = 1 ] && echo --check) || rc=1
 if [ $check = 0 ]; then
   touch "$ENVF"; chmod 600 "$ENVF"
   grep -qE '^LITELLM_MASTER_KEY=.+' "$ENVF" || { printf 'LITELLM_MASTER_KEY=sk-litellm-%s\n' "$(openssl rand -hex 24)" >> "$ENVF"; say created "master key"; }

@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# litellm-db: the LiteLLM proxy's own Postgres (models/keys added in the UI persist here).
+#
+#   litellm-db setup [--check]   dedicated cluster on 127.0.0.1:5433 (never the Homebrew default
+#                                instance), role + database `litellm`, LaunchAgents for the server
+#                                and a daily backup, secrets in ~/.config/litellm/env
+#   litellm-db status            server up? reachable as litellm? latest backup age
+#   litellm-db backup            pg_dump -Fc now into $LITELLM_BACKUP_DIR, keep the newest 14
+#   litellm-db restore FILE      restore a dump into the litellm database (asks first)
+#   litellm-db secrets-push      copy the env secrets into a 1Password item (values never printed)
+#   litellm-db secrets-pull      fill missing env secrets from that 1Password item (new machine)
+#
+# Machine-local, non-secret settings: ~/.config/litellm/settings (never committed)
+#   LITELLM_BACKUP_DIR=...        where dumps go (default ~/.local/share/litellm/backups)
+#   LITELLM_OP_ACCOUNT=...        1Password account for secrets-push/pull
+#   LITELLM_OP_VAULT=...          1Password vault for secrets-push/pull
+#
+# LITELLM_SALT_KEY encrypts provider keys stored in the database. It is generated once and must
+# never change: losing it makes every stored provider key unreadable. Keep it in 1Password.
+set -euo pipefail
+PG=/opt/homebrew/opt/postgresql@17/bin
+D="$HOME/.config/litellm"; ENVF="$D/env"; SETTINGS="$D/settings"
+SHARE="$HOME/.local/share/litellm"; DATA="$SHARE/pgdata"; SOCK="$SHARE/run"
+PORT=5433
+DB_LABEL=com.getfatday.litellm-db; BK_LABEL=com.getfatday.litellm-backup
+LA="$HOME/Library/LaunchAgents"
+[ -r "$SETTINGS" ] && . "$SETTINGS"
+BACKUP_DIR="${LITELLM_BACKUP_DIR:-$SHARE/backups}"
+ITEM="LiteLLM proxy - $(scutil --get LocalHostName 2>/dev/null || hostname -s)"   # no () : op:// refs reject them
+say() { printf '%-10s %s\n' "$1" "$2"; }
+envget() { grep -E "^$1=" "$ENVF" 2>/dev/null | head -1 | cut -d= -f2-; }
+envset() {  # add KEY=VALUE only if KEY is missing or empty; never print VALUE
+  touch "$ENVF"; chmod 600 "$ENVF"
+  if [ -z "$(envget "$1")" ]; then
+    local tmp; tmp="$(mktemp)"; grep -vE "^$1=" "$ENVF" > "$tmp" || true
+    printf '%s=%s\n' "$1" "$2" >> "$tmp"; cat "$tmp" > "$ENVF"; rm -f "$tmp"; return 0
+  fi
+  return 1
+}
+psql_su() { "$PG/psql" -h "$SOCK" -p "$PORT" -U postgres -d postgres -Atq "$@"; }
+plist() {  # label, program args...
+  local label="$1"; shift
+  local args=""; for a in "$@"; do args="$args<string>$a</string>"; done
+  cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key><array>$args</array>
+  $EXTRA
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/$label.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/$label.log</string>
+</dict></plist>
+EOF
+}
+ensure_agent() {  # label, plist-content, check
+  local label="$1" want="$2" check="$3" f="$LA/$1.plist"
+  if [ -f "$f" ] && [ "$(cat "$f")" = "$want" ]; then say ok "$label plist"
+  elif [ "$check" = 1 ]; then say missing "$label plist"; return 1
+  else mkdir -p "$LA"; printf '%s\n' "$want" > "$f"; launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true; say wrote "$f"; fi
+  if launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then say ok "$label loaded"
+  elif [ "$check" = 1 ]; then say missing "$label not loaded"; return 1
+  else launchctl bootstrap "gui/$(id -u)" "$f"; say loaded "$label"; fi
+}
+
+cmd_setup() {
+  local check=0 rc=0; [ "${1:-}" = "--check" ] && check=1
+  [ -x "$PG/postgres" ] && say ok "postgresql@17" || { say missing "postgresql@17 (brew install postgresql@17)"; return 1; }
+  mkdir -p "$SHARE" "$SOCK" "$D"; chmod 700 "$SHARE" "$SOCK"
+
+  if [ -f "$DATA/PG_VERSION" ]; then say ok "cluster $DATA"
+  elif [ $check = 1 ]; then say missing "cluster $DATA"; rc=1
+  else
+    "$PG/initdb" -D "$DATA" -U postgres --auth-local=trust --auth-host=scram-sha-256 -E UTF8 --locale=en_US.UTF-8 >/dev/null
+    cat >> "$DATA/postgresql.conf" <<EOF
+
+# litellm-db (dotfiles litellm module)
+listen_addresses = 'localhost'
+port = $PORT
+unix_socket_directories = '$SOCK'
+EOF
+    say created "cluster $DATA (port $PORT, socket dir 0700)"
+  fi
+
+  if [ $check = 0 ]; then
+    envset LITELLM_DB_PASSWORD "$(openssl rand -hex 24)" && say created "db password" || true
+    envset LITELLM_SALT_KEY "sk-salt-$(openssl rand -hex 24)" && say created "salt key (store it in 1Password)" || true
+    local pw; pw="$(envget LITELLM_DB_PASSWORD)"
+    envset DATABASE_URL "postgresql://litellm:$pw@127.0.0.1:$PORT/litellm" && say created "DATABASE_URL" || true
+  fi
+  for k in LITELLM_DB_PASSWORD LITELLM_SALT_KEY DATABASE_URL; do
+    [ -n "$(envget $k)" ] && say ok "env $k" || { say missing "env $k"; rc=1; }
+  done
+
+  # LC_ALL is required: without it launchd-started postgres dies with
+  # "postmaster became multithreaded during startup" on macOS.
+  EXTRA="<key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>30</integer><key>EnvironmentVariables</key><dict><key>LC_ALL</key><string>en_US.UTF-8</string></dict>"
+  ensure_agent "$DB_LABEL" "$(plist "$DB_LABEL" "$PG/postgres" -D "$DATA")" $check || rc=1
+  EXTRA="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>17</integer></dict>"
+  ensure_agent "$BK_LABEL" "$(plist "$BK_LABEL" "$HOME/.local/bin/litellm-db" backup)" $check || rc=1
+
+  if [ $check = 0 ]; then
+    for _ in $(seq 1 30); do psql_su -c 'select 1' >/dev/null 2>&1 && break; sleep 1; done
+    local pw; pw="$(envget LITELLM_DB_PASSWORD)"
+    if [ "$(psql_su -c "select 1 from pg_roles where rolname='litellm'")" != 1 ]; then
+      psql_su -c "create role litellm login password '$pw'" && say created "role litellm"
+    else psql_su -c "alter role litellm password '$pw'" >/dev/null; fi
+    if [ "$(psql_su -c "select 1 from pg_database where datname='litellm'")" != 1 ]; then
+      psql_su -c "create database litellm owner litellm" && say created "database litellm"
+    fi
+  fi
+  cmd_status || rc=1
+  return $rc
+}
+
+cmd_status() {
+  local rc=0
+  psql_su -c 'select 1' >/dev/null 2>&1 && say ok "server up (:$PORT)" || { say fail "server not answering on :$PORT"; rc=1; }
+  if PGPASSWORD="$(envget LITELLM_DB_PASSWORD)" "$PG/psql" -h 127.0.0.1 -p "$PORT" -U litellm -d litellm -Atqc 'select 1' >/dev/null 2>&1
+  then say ok "login as litellm"; else say fail "login as litellm"; rc=1; fi
+  local last; last="$(ls -t "$BACKUP_DIR"/litellm-*.dump 2>/dev/null | head -1 || true)"
+  if [ -n "$last" ]; then
+    local age=$(( ( $(date +%s) - $(stat -f %m "$last") ) / 3600 ))
+    [ $age -le 36 ] && say ok "backup ${age}h old: $last" || { say stale "backup ${age}h old: $last"; rc=1; }
+  else say missing "no backup yet in $BACKUP_DIR (run: litellm-db backup)"; rc=1; fi
+  return $rc
+}
+
+cmd_backup() {
+  mkdir -p "$BACKUP_DIR"
+  local out="$BACKUP_DIR/litellm-$(date +%Y%m%d-%H%M%S).dump"
+  PGPASSWORD="$(envget LITELLM_DB_PASSWORD)" "$PG/pg_dump" -h 127.0.0.1 -p "$PORT" -U litellm -d litellm -Fc -f "$out.part"
+  mv "$out.part" "$out"; chmod 600 "$out"
+  ls -t "$BACKUP_DIR"/litellm-*.dump 2>/dev/null | tail -n +15 | while read -r old; do rm -f "$old"; done
+  say backup "$out"
+}
+
+cmd_restore() {
+  local f="${1:?usage: litellm-db restore FILE}"
+  [ -f "$f" ] || { echo "no such file: $f" >&2; return 2; }
+  read -r -p "Replace the litellm database with $f? Type 'restore' to continue: " ans
+  [ "$ans" = restore ] || { echo "aborted"; return 1; }
+  launchctl bootout "gui/$(id -u)/com.getfatday.litellm" 2>/dev/null || true
+  PGPASSWORD="$(envget LITELLM_DB_PASSWORD)" "$PG/pg_restore" -h 127.0.0.1 -p "$PORT" -U litellm -d litellm --clean --if-exists "$f"
+  launchctl bootstrap "gui/$(id -u)" "$LA/com.getfatday.litellm.plist"
+  say restored "$f (proxy restarted)"
+}
+
+op_args() {
+  [ -n "${LITELLM_OP_ACCOUNT:-}" ] && [ -n "${LITELLM_OP_VAULT:-}" ] || {
+    echo "set LITELLM_OP_ACCOUNT and LITELLM_OP_VAULT in $SETTINGS" >&2; return 2; }
+  printf -- '--account=%s --vault=%s' "$LITELLM_OP_ACCOUNT" "$LITELLM_OP_VAULT"
+}
+SECRET_KEYS="LITELLM_MASTER_KEY LITELLM_SALT_KEY LITELLM_DB_PASSWORD"
+
+# 1Password layout: a Login item. username=admin, password=LITELLM_MASTER_KEY (the UI login),
+# URL=the UI, and the other secrets as concealed fields labelled by their env names.
+op_field() { case "$1" in LITELLM_MASTER_KEY) echo password ;; *) echo "$1" ;; esac; }
+
+cmd_secrets_push() {
+  local a; a="$(op_args)" || return 2
+  local tpl="$SHARE/.op-item.json"
+  # JSON template on disk (0600, removed after): secret values never appear in argv or output.
+  ( umask 077; "$(/opt/homebrew/bin/uv tool dir)/litellm/bin/python" - "$ENVF" "$SECRET_KEYS" > "$tpl" ) <<'PY'
+import json, sys
+envf, keys = sys.argv[1], sys.argv[2].split()
+env = dict(l.rstrip("\n").split("=", 1) for l in open(envf) if "=" in l)
+fields = [
+    {"id": "username", "type": "STRING", "purpose": "USERNAME", "label": "username", "value": "admin"},
+    {"id": "password", "type": "CONCEALED", "purpose": "PASSWORD", "label": "password",
+     "value": env["LITELLM_MASTER_KEY"]},
+]
+for k in keys:
+    if k != "LITELLM_MASTER_KEY" and env.get(k):
+        fields.append({"id": k.lower(), "type": "CONCEALED", "label": k, "value": env[k]})
+fields.append({"id": "notesPlain", "type": "STRING", "purpose": "NOTES", "label": "notesPlain",
+               "value": "Local LiteLLM proxy (dotfiles litellm module). Password = LITELLM_MASTER_KEY. "
+                        "LITELLM_SALT_KEY must never change: it decrypts provider keys stored in the DB. "
+                        "Restore on a new machine: litellm-db secrets-pull, then litellm-setup."})
+print(json.dumps({"category": "LOGIN", "fields": fields,
+                  "urls": [{"label": "website", "primary": True, "href": "http://127.0.0.1:4000/ui"}]}))
+PY
+  # shellcheck disable=SC2086
+  if op item get "$ITEM" $a >/dev/null 2>&1; then
+    op item delete "$ITEM" $a --archive >/dev/null && say archived "previous 1Password item"
+  fi
+  # shellcheck disable=SC2086
+  if op item create $a --title "$ITEM" --template "$tpl" >/dev/null; then
+    rm -f "$tpl"; say pushed "'$ITEM' -> 1Password vault $LITELLM_OP_VAULT"
+  else
+    rm -f "$tpl"; say fail "1Password item create"; return 1
+  fi
+}
+
+cmd_secrets_pull() {
+  local a rc=0; a="$(op_args)" || return 2
+  for k in $SECRET_KEYS; do
+    if [ -n "$(envget "$k")" ]; then say ok "env $k (kept)"; continue; fi
+    # shellcheck disable=SC2086
+    v="$(op item get "$ITEM" $a --fields "label=$(op_field "$k")" --reveal 2>/dev/null || true)"
+    if [ -n "$v" ]; then envset "$k" "$v"; say pulled "$k"; else say missing "$k in 1Password"; rc=1; fi
+  done
+  return $rc
+}
+
+case "${1:-status}" in
+  setup) shift; cmd_setup "$@" ;;
+  status) cmd_status ;;
+  backup) cmd_backup ;;
+  restore) shift; cmd_restore "$@" ;;
+  secrets-push) cmd_secrets_push ;;
+  secrets-pull) cmd_secrets_pull ;;
+  *) sed -n '2,20p' "$0"; exit 2 ;;
+esac
