@@ -8,8 +8,8 @@
 #                         (Hermes drives Claude Code)
 #   hermes-bridge-verify  binary checks; --live adds codeword round trips with resume
 #   hermes-bridge-setup   installs claude and hermes if missing, links the Hermes skill
-#   hermes-timesheets-bootstrap  idempotently builds the Hermes `timesheets` profile, board and
-#                         PAUSED weekly cron job from ~/.local/share/hermes-bridge/timesheets
+# The `timesheets` agent moved to the EG overlay ianderson_expedia/agents and is installed by
+# ~/src/hermes-agents/scripts/sync.sh (it no longer lives in this personal repo).
 # The Claude skill is stowed to ~/.claude/skills/hermes. The Hermes skill is NOT stowed under
 # ~/.hermes (Hermes' own state dir, created by its installer); it ships under
 # ~/.local/share/hermes-bridge/hermes-skills and hermes-bridge-setup symlinks it into
