@@ -11,6 +11,9 @@
 #   ~/.config/litellm/env              machine-local secrets (LITELLM_MASTER_KEY, provider keys),
 #                                      chmod 600; written by litellm-setup, never committed
 #   litellm-setup [--check]            installs the pinned litellm, writes env + LaunchAgent, loads it
+#   litellm-db setup|status|backup|restore|secrets-push|secrets-pull
+#                                      dedicated Postgres on 127.0.0.1:5433 (UI-added models persist),
+#                                      daily pg_dump (keep 14) to $LITELLM_BACKUP_DIR, secrets <-> 1Password
 #   litellm-check [--live] [--json]    health: installed, agent loaded, port, auth'd /v1/models;
 #                                      --live adds one cheap completion
 #
@@ -24,6 +27,7 @@ requires: [macos, llm-proxy-host]
 
 homebrew_packages:
   - uv
+  - postgresql@17
 
 stow_dirs:
   - litellm
