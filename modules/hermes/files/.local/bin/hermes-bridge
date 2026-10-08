@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# hermes-bridge: thin JSON wrapper so Claude Code can drive Hermes Agent.
+# Pass-through by design: no toolset or approval policy is added; Hermes uses its own config.
+# Note: `hermes -z` is Hermes' own one-shot mode and it runs with approvals off (hermes_cli/oneshot.py).
+# The one non-policy default: a model pin, because this install's configured default model returns 404.
+# Override with HERMES_BRIDGE_MODEL / HERMES_BRIDGE_PROVIDER, or set both to "" to use Hermes' default.
+set -uo pipefail
+MODEL="${HERMES_BRIDGE_MODEL-claude-haiku-4-5-20251001}"
+PROVIDER="${HERMES_BRIDGE_PROVIDER-anthropic}"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/hermes-bridge.XXXXXX")"; trap 'rm -rf "$TMP"' EXIT
+need() { command -v "$1" >/dev/null 2>&1 || { jq -n --arg e "missing dependency: $1" '{ok:false,error:$e}'; exit 3; }; }
+need jq; need hermes
+verb="${1:-}"; shift || true
+case "$verb" in
+  status)
+    jq -n --arg v "$(hermes --version 2>/dev/null | head -1)" --arg cfg "$(hermes config get approvals.mode 2>/dev/null | tail -1)" \
+      '{ok:true,version:$v,approvals_mode:$cfg}';;
+  ask)      # hermes-bridge ask [--resume ID] [--toolsets T] [--model M] [--extra "FLAGS"] -- PROMPT (or stdin)
+    resume=""; toolsets=""; extra=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --resume) resume="$2"; shift 2;; --toolsets) toolsets="$2"; shift 2;;
+      --model) MODEL="$2"; shift 2;; --extra) extra="$2"; shift 2;; --) shift; break;; *) break;; esac; done
+    if [ $# -gt 0 ]; then printf '%s' "$*" > "$TMP/q"; else cat > "$TMP/q"; fi
+    args=(-z "$(cat "$TMP/q")" --usage-file "$TMP/u.json")
+    [ -n "$MODEL" ] && args+=(-m "$MODEL"); [ -n "$PROVIDER" ] && args+=(--provider "$PROVIDER")
+    [ -n "$toolsets" ] && args+=(-t "$toolsets"); [ -n "$resume" ] && args+=(--resume "$resume")
+    # shellcheck disable=SC2206
+    [ -n "$extra" ] && args+=($extra)
+    out="$(hermes "${args[@]}" 2>"$TMP/err")"; rc=$?
+    if [ $rc -ne 0 ] || [ ! -s "$TMP/u.json" ] || [ "$(jq -r '.failed // false' "$TMP/u.json" 2>/dev/null)" = "true" ]; then
+      jq -n --arg o "$out" --arg e "$(head -c 400 "$TMP/err")" --argjson rc "$rc" '{ok:false,rc:$rc,error:($o+" "+$e)}'; exit 1; fi
+    jq -n --arg r "$out" --slurpfile u "$TMP/u.json" \
+      '{ok:true,result:$r,session_id:($u[0].session_id // null),cost_usd:($u[0].total_including_auxiliary.estimated_cost_usd // $u[0].estimated_cost_usd // null),usage:$u[0]}';;
+  sessions) hermes sessions list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | jq -R -s '{ok:true,text:.}';;
+  doctor)
+    jq -n --argjson st "$("$0" status)" --arg skills "$(hermes skills list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -c 'enabled')" \
+      '{ok:true,status:$st,enabled_skills:($skills|tonumber),policy:"pass-through"}';;
+  *) echo 'usage: hermes-bridge {status|ask [--resume ID] [--toolsets T] [--model M] [--extra FLAGS] [--] PROMPT|sessions|doctor}' >&2; exit 2;;
+esac

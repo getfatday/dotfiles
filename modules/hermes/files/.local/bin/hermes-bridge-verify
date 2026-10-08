@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# hermes-bridge-verify: binary assertions for the Hermes <-> Claude Code bridge. Exit 0 = all pass.
+# Default is free (no model calls). --live adds two cheap round trips (about $0.01 total).
+set -uo pipefail; live=0; [ "${1:-}" = "--live" ] && live=1
+pass=0; fail=0; t() { if eval "$2" >/dev/null 2>&1; then echo "PASS $1"; pass=$((pass+1)); else echo "FAIL $1"; fail=$((fail+1)); fi; }
+H=$HOME/.local/bin
+t "A1 hermes-bridge on PATH and executable"     "[ -x $H/hermes-bridge ] || command -v hermes-bridge"
+t "A2 claude-bridge on PATH and executable"     "[ -x $H/claude-bridge ] || command -v claude-bridge"
+t "A3 hermes-bridge status returns ok JSON"     "hermes-bridge status | jq -e .ok"
+t "A4 claude-bridge doctor sees the token file" "claude-bridge doctor | jq -e '.token_env_readable==true'"
+t "A9 both wrappers are pass-through (no policy)" "claude-bridge doctor | jq -e '.policy==\"pass-through\"' && hermes-bridge doctor | jq -e '.policy==\"pass-through\"'"
+t "A5 claude-bridge list returns a JSON array"  "claude-bridge list | jq -e 'type==\"array\"'"
+t "A6 Claude skill 'hermes' is installed"       "grep -q '^name: hermes' $HOME/.claude/skills/hermes/SKILL.md"
+t "A7 Hermes sees claude-code-bridge skill"     "[ -n \"\$(hermes skills list 2>&1 | grep claude-code-bridge)\" ]"
+# A8 follows symlinks (find -L): after dotm apply every file here is a link into ~/.dotmodules.
+t "A8 no secret values in module files"         "! find -L $HOME/.claude/skills/hermes $HOME/.local/share/hermes-bridge/hermes-skills $H/hermes-bridge $H/claude-bridge $H/hermes-bridge-setup -type f -exec grep -EIl 'sk-ant-|oat01|ANTHROPIC_API_KEY=.' {} + | grep -q ."
+if [ $live -eq 1 ]; then
+  s=$(hermes-bridge ask -- 'Remember codeword ALPHA-1. Reply with exactly: STORED' | jq -r .session_id)
+  t "L1 Claude->Hermes ask then resume recalls context" "hermes-bridge ask --resume $s -- 'Codeword only.' | jq -e '.result|test(\"ALPHA-1\")'"
+  c=$(claude-bridge ask --model claude-haiku-5-5 -- 'Remember codeword BETA-2. Reply with exactly: STORED' | jq -r .session_id)
+  t "L2 Hermes->Claude ask then resume recalls context" "claude-bridge ask --model claude-haiku-5-5 --resume $c -- 'Codeword only.' | jq -e '.result|test(\"BETA-2\")'"
+fi
+echo "RESULT pass=$pass fail=$fail"; [ $fail -eq 0 ]
