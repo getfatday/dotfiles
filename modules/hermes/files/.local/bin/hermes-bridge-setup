@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# hermes-bridge-setup: idempotent setup for the Hermes <-> Claude Code bridge (dotm module: hermes).
+# Plumbing only, pass-through by design: installs nothing but the two agents' own official
+# installers, adds no policy, and never prints a secret. Safe to rerun.
+#   hermes-bridge-setup          install claude and hermes if missing, link the Hermes skill
+#   hermes-bridge-setup --check  report only, never installs or links
+# Prints one JSON line per step. Exit 0 = everything present, 1 = something missing (see fix).
+set -uo pipefail
+check=0; [ "${1:-}" = "--check" ] && check=1
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+missing=0
+say() { # say STEP OK DETAIL [FIX]
+  local fix="${4:-}"
+  printf '{"step":"%s","ok":%s,"detail":"%s"%s}\n' "$1" "$2" "$3" "${fix:+,\"fix\":\"$fix\"}"
+  [ "$2" = true ] || missing=1
+}
+ver() { local v; v="$("$@" --version 2>/dev/null | head -1 | tr -d '"\\')"; echo "${v:-present (version unavailable)}"; }
+
+# 1. Claude Code (official native installer)
+if ! command -v claude >/dev/null 2>&1 && [ $check -eq 0 ]; then
+  curl -fsSL https://claude.ai/install.sh | bash >&2
+  hash -r
+fi
+if command -v claude >/dev/null 2>&1; then say claude true "$(ver claude)"
+else say claude false "claude not found" "rerun without --check, or: curl -fsSL https://claude.ai/install.sh | bash"; fi
+
+# 2. Hermes Agent (official installer; --non-interactive skips its setup and gateway stages)
+have_hermes() { [ -x "$HOME/.local/bin/hermes" ] || command -v hermes >/dev/null 2>&1; }
+if ! have_hermes && [ $check -eq 0 ]; then
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive >&2
+  hash -r
+fi
+if have_hermes; then say hermes true "$(ver hermes)"
+else say hermes false "hermes not found" "rerun without --check, or: curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive"; fi
+
+# 3. Link the Hermes skill into Hermes' skill tree (~/.hermes is Hermes' state, never stowed)
+src="$HOME/.local/share/hermes-bridge/hermes-skills/claude-code-bridge"
+dir="$HOME/.hermes/skills/autonomous-ai-agents"
+link="$dir/claude-code-bridge"
+if [ ! -f "$src/SKILL.md" ]; then
+  say skill-link false "$src/SKILL.md missing" "run dotm sync (module hermes needs capability hermes-host)"
+elif [ -L "$link" ] && [ "$(readlink "$link")" = "$src" ]; then
+  say skill-link true "$link -> $src"
+elif [ -e "$link" ] && [ ! -L "$link" ]; then
+  say skill-link false "$link is a real path, not touched" "move it aside, then rerun"
+elif [ $check -eq 1 ]; then
+  say skill-link false "$link not linked to $src" "rerun without --check"
+elif [ -L "$dir" ] || [ -L "$HOME/.hermes/skills" ] || [ -L "$HOME/.hermes" ]; then
+  say skill-link false "a parent of $link is a symlink, not touched" "make it a real directory, then rerun"
+else
+  mkdir -p "$dir" && ln -sfn "$src" "$link"
+  if [ -L "$link" ] && [ "$(readlink "$link")" = "$src" ]; then say skill-link true "$link -> $src (linked)"
+  else say skill-link false "could not link $link" "check permissions on $dir"; fi
+fi
+
+# 4. Auth presence only. Values are never read into output.
+tok="$HOME/.claude/.crux-oauth-token.env"
+if [ -r "$tok" ]; then say claude-token true "$tok readable"
+else say claude-token false "$tok not readable" "claude setup-token, then save it to $tok (or claude-bridge uses the normal login)"; fi
+k=ANTHROPIC_API_KEY
+n=$(grep -c "^${k}=." "$HOME/.hermes/.env" 2>/dev/null); n=${n:-0}
+if [ "$n" -gt 0 ]; then say hermes-key true "$HOME/.hermes/.env has a non-empty $k line"
+else say hermes-key false "$HOME/.hermes/.env has no non-empty $k line" "run hermes setup, or add the $k line to ~/.hermes/.env"; fi
+
+# 5. Summary
+if [ $missing -eq 0 ]; then echo '{"step":"summary","ok":true,"next":"hermes-bridge-verify"}'; exit 0
+else echo '{"step":"summary","ok":false,"next":"apply the fix lines above, then rerun hermes-bridge-setup"}'; exit 1; fi

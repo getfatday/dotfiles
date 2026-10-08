@@ -1,0 +1,32 @@
+---
+# Hermes module
+# The Hermes Agent <-> Claude Code bridge. Plumbing only, pass-through by design: the
+# wrappers add no permission modes, allow/deny lists, folder allowlists, turn or spend caps,
+# or toolset guards. Each side runs with its own config.
+#   hermes-bridge         JSON wrapper over `hermes -z` (Claude Code drives Hermes)
+#   claude-bridge         JSON wrapper over `claude -p` / `claude agents` / `claude --bg`
+#                         (Hermes drives Claude Code)
+#   hermes-bridge-verify  binary checks; --live adds codeword round trips with resume
+#   hermes-bridge-setup   installs claude and hermes if missing, links the Hermes skill
+# The Claude skill is stowed to ~/.claude/skills/hermes. The Hermes skill is NOT stowed under
+# ~/.hermes (Hermes' own state dir, created by its installer); it ships under
+# ~/.local/share/hermes-bridge/hermes-skills and hermes-bridge-setup symlinks it into
+# ~/.hermes/skills/autonomous-ai-agents/claude-code-bridge.
+# Relies on: productivity (jq). No packages here: claude and hermes come from their official
+# installers, run by hermes-bridge-setup.
+
+# Selected only on a Mac that declares `hermes-host` under `capabilities:` in its
+# ~/.config/dotm/config.yml. `macos` is the repo's landing contract for opt-in base modules
+# (test_role.py OPT_IN); the bridge skills target macOS.
+requires: [macos, hermes-host]
+
+stow_dirs:
+  - hermes
+
+# Note: after apply run once:
+#   hermes-bridge-setup          # install claude + hermes if missing, link the Hermes skill
+#   hermes-bridge-setup --check  # report only, never installs
+# then:
+#   hermes-bridge-verify         # free binary checks; --live adds two cheap model round trips
+# No credentials live in this module. Auth stays machine-local:
+#   ~/.claude/.crux-oauth-token.env (claude token) and ~/.hermes/.env (ANTHROPIC_API_KEY).

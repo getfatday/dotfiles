@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# claude-bridge: thin JSON wrapper so Hermes (or anything) can drive Claude Code.
+# Pass-through by design: no permission, tool, folder, turn or spend policy is added here.
+# Children inherit the user's own Claude Code settings. Add flags per call if you want limits:
+#   claude-bridge ask --extra "--permission-mode plan --max-turns 3" -- PROMPT
+# The one thing it does: headless claude needs the long-lived token sourced IN THE SAME SHELL,
+# done in a subshell so the value never reaches the caller and is never printed.
+set -uo pipefail
+ENVF="${CLAUDE_BRIDGE_TOKEN_ENV:-$HOME/.claude/.crux-oauth-token.env}"
+need() { command -v "$1" >/dev/null 2>&1 || { echo "{\"ok\":false,\"error\":\"missing dependency: $1\"}"; exit 3; }; }
+need jq; need claude
+cl() { ( [ -r "$ENVF" ] && . "$ENVF"; exec claude "$@" ); }
+verb="${1:-}"; shift || true
+case "$verb" in
+  ask)   # claude-bridge ask [--resume ID] [--model M] [--cwd DIR] [--extra "FLAGS"] -- PROMPT
+    resume=""; model=""; cwd="$PWD"; extra=""
+    while [ $# -gt 0 ]; do case "$1" in
+      --resume) resume="$2"; shift 2;; --model) model="$2"; shift 2;; --cwd) cwd="$2"; shift 2;;
+      --extra) extra="$2"; shift 2;; --) shift; break;; *) break;; esac; done
+    prompt="$*"; [ -z "$prompt" ] && prompt="$(cat)"
+    args=(-p "$prompt" --output-format json)
+    [ -n "$resume" ] && args+=(--resume "$resume"); [ -n "$model" ] && args+=(--model "$model")
+    # shellcheck disable=SC2206
+    [ -n "$extra" ] && args+=($extra)
+    out="$(cd "$cwd" && cl "${args[@]}" 2>/dev/null)"
+    echo "$out" | jq -e '.session_id' >/dev/null 2>&1 || { jq -n --arg o "${out:0:300}" '{ok:false,error:("no JSON from claude: "+$o)}'; exit 1; }
+    echo "$out" | jq '{ok:(.is_error|not),result,session_id,model:(.modelUsage|keys[0]),cost_usd:.total_cost_usd,turns:.num_turns,subtype,permission_denials:(.permission_denials // [] | map(.tool_name // .))}';;
+  list)  cl agents --json --all 2>/dev/null | jq 'map({id,name,state,kind,cwd,sessionId})' ;;
+  spawn) # claude-bridge spawn [--cwd DIR] NAME PROMPT
+    cwd="$PWD"; [ "${1:-}" = "--cwd" ] && { cwd="$2"; shift 2; }
+    name="$1"; shift; out="$(cd "$cwd" && cl --bg --name "$name" "$*" 2>&1)"; echo "$out" | jq -R -s --arg n "$name" '{ok:true,name:$n,output:.}';;
+  logs)  cl logs "$1" 2>&1 | tail -n "${2:-40}" | jq -R -s '{ok:true,text:.}';;
+  doctor)
+    jq -n --arg v "$(claude --version 2>&1)" --argjson tok "$([ -r "$ENVF" ] && echo true || echo false)" \
+      --argjson n "$(cl agents --json --all 2>/dev/null | jq 'length' 2>/dev/null || echo null)" \
+      '{ok:true,claude:$v,token_env_readable:$tok,sessions_visible:$n,policy:"pass-through"}';;
+  *) echo 'usage: claude-bridge {ask [--resume ID] [--model M] [--cwd DIR] [--extra FLAGS] -- PROMPT|list|spawn [--cwd DIR] NAME PROMPT|logs ID [N]|doctor}' >&2; exit 2;;
+esac
