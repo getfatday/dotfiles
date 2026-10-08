@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# litellm-check: is the local LiteLLM proxy usable? Exit 0 only if every check passes.
+#   --live   also run one tiny completion on the `cheap` group (costs a fraction of a cent)
+#   --json   one JSON object on stdout
+# Read-only: never installs, restarts or edits anything (use litellm-setup for that).
+set -uo pipefail
+PORT="${LITELLM_PORT:-4000}"; URL="http://127.0.0.1:$PORT"
+ENVF="$HOME/.config/litellm/env"; LABEL=com.getfatday.litellm
+live=0; json=0
+for a in "$@"; do case "$a" in --live) live=1;; --json) json=1;; esac; done
+declare -a names=() vals=()
+add() { names+=("$1"); vals+=("$2"); }
+key="$(grep -E '^LITELLM_MASTER_KEY=' "$ENVF" 2>/dev/null | head -1 | cut -d= -f2-)"
+
+/opt/homebrew/bin/uv tool list 2>/dev/null | grep -q '^litellm ' && add installed ok || add installed fail
+launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 && add agent ok || add agent fail
+curl -fsS -m 5 "$URL/health/liveliness" >/dev/null 2>&1 && add port ok || add port fail
+models="$(curl -fsS -m 10 -H "Authorization: Bearer $key" "$URL/v1/models" 2>/dev/null)"
+if [ -n "$models" ] && printf '%s' "$models" | grep -q '"cheap"'; then add models ok; else add models fail; fi
+if [ $live = 1 ]; then
+  out="$(curl -fsS -m 60 -H "Authorization: Bearer $key" -H 'Content-Type: application/json' \
+    -d '{"model":"cheap","max_tokens":5,"messages":[{"role":"user","content":"Reply: ok"}]}' \
+    "$URL/v1/chat/completions" 2>/dev/null)"
+  printf '%s' "$out" | grep -q '"choices"' && add live ok || add live fail
+fi
+
+rc=0
+for i in "${!names[@]}"; do [ "${vals[$i]}" = ok ] || rc=1; done
+if [ $json = 1 ]; then
+  printf '{"url":"%s","ok":%s' "$URL" "$([ $rc = 0 ] && echo true || echo false)"
+  for i in "${!names[@]}"; do printf ',"%s":"%s"' "${names[$i]}" "${vals[$i]}"; done
+  printf '}\n'
+else
+  for i in "${!names[@]}"; do printf '%-10s %s\n' "${vals[$i]}" "${names[$i]}"; done
+  [ $rc = 0 ] || echo "fix: litellm-setup   (logs: ~/Library/Logs/litellm.log)"
+fi
+exit $rc

@@ -1,0 +1,27 @@
+# Base LiteLLM config (stowed by the dotfiles litellm module).
+# Group names are the contract with Hermes agents (hermes-agents tiers.yaml). Keep them stable;
+# change what they point at. Machine-local additions go in conf.d/*.yaml (merged at start).
+model_list:
+  - model_name: deep
+    litellm_params: {model: anthropic/claude-fable-5-1, api_key: os.environ/ANTHROPIC_API_KEY}
+  - model_name: research
+    litellm_params: {model: anthropic/claude-opus-5-5, api_key: os.environ/ANTHROPIC_API_KEY}
+  - model_name: worker
+    litellm_params: {model: anthropic/claude-sonnet-5-5, api_key: os.environ/ANTHROPIC_API_KEY}
+  - model_name: cheap
+    litellm_params: {model: anthropic/claude-haiku-5-5, api_key: os.environ/ANTHROPIC_API_KEY}
+  # Pass-through: any explicit Anthropic model id, e.g. "anthropic/claude-opus-5-5".
+  - model_name: anthropic/*
+    litellm_params: {model: anthropic/*, api_key: os.environ/ANTHROPIC_API_KEY}
+
+router_settings:
+  num_retries: 2
+  fallbacks:
+    - {deep: [research]}
+    - {research: [worker]}
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

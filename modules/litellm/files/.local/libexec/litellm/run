@@ -1,0 +1,30 @@
+#!/bin/sh
+# LaunchAgent entry point: load machine-local env, merge base + conf.d configs, exec litellm.
+set -eu
+D="$HOME/.config/litellm"
+[ -r "$D/env" ] && { set -a; . "$D/env"; set +a; }
+export LITELLM_TELEMETRY=False
+TOOL_BIN="$(/opt/homebrew/bin/uv tool dir)/litellm/bin"
+OUT="$D/.merged.yaml"
+"$TOOL_BIN/python" - "$D" "$OUT" <<'PY'
+import glob, os, sys, yaml
+d, out = sys.argv[1], sys.argv[2]
+def merge(a, b):
+    for k, v in (b or {}).items():
+        if k == "model_list":
+            a.setdefault(k, []).extend(v or [])
+        elif k == "fallbacks" and isinstance(v, list):
+            a.setdefault(k, []).extend(v)
+        elif isinstance(v, dict) and isinstance(a.get(k), dict):
+            merge(a[k], v)
+        else:
+            a[k] = v
+    return a
+cfg = yaml.safe_load(open(os.path.join(d, "config.yaml"))) or {}
+for f in sorted(glob.glob(os.path.join(d, "conf.d", "*.yaml"))):
+    merge(cfg, yaml.safe_load(open(f)) or {})
+fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as fh:
+    yaml.safe_dump(cfg, fh, sort_keys=False)
+PY
+exec "$TOOL_BIN/litellm" --config "$OUT" --host 127.0.0.1 --port "${LITELLM_PORT:-4000}"
