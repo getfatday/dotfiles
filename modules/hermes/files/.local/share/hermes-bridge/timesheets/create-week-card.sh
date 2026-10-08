@@ -17,7 +17,7 @@ SIDECAR="$PROFILE/timesheets.env"
 TIMESHEETS_MODE=canary
 [ -r "$SIDECAR" ] && . "$SIDECAR"
 
-week="$(date +%G-W%V)"
+week="$(/bin/date +%G-W%V)"
 args=(kanban --board timesheets create "Timesheets $week"
       --idempotency-key "timesheets-$week"
       --max-runtime 2h --max-retries 3
