@@ -63,8 +63,10 @@ fi
 
 # 4. Auth presence only. Values are never read into output.
 tok="$HOME/.claude/.crux-oauth-token.env"
-if [ -r "$tok" ]; then say claude-token true "$tok readable"
-else say claude-token false "$tok not readable" "claude setup-token, then save it to $tok (or claude-bridge uses the normal login)"; fi
+if [ -r "$tok" ]; then say claude-auth true "$tok readable (headless token)"
+elif claude auth status --json 2>/dev/null | jq -e '.loggedIn == true' >/dev/null 2>&1; then
+  say claude-auth true "no token file; normal login active ($(claude auth status --json 2>/dev/null | jq -r '.authMethod // "unknown"'))"
+else say claude-auth false "no token file and not logged in" "run claude and /login, or claude setup-token and save it to $tok"; fi
 # Hermes credentials: any non-empty *_API_KEY line in $HH/.env, or a non-empty credential pool in $HH/auth.json
 n=$(grep -cE '^[A-Z0-9_]+_API_KEY=.' "$HH/.env" 2>/dev/null); n=${n:-0}
 p=$(jq -r '[.credential_pool // {} | to_entries[] | .value | length] | add // 0' "$HH/auth.json" 2>/dev/null); p=${p:-0}
