@@ -22,6 +22,7 @@ claude-bridge ask -- "PROMPT"                          # headless, returns {ok,r
 claude-bridge ask --resume SESSION_ID -- "NEXT"        # continue that session
 claude-bridge ask --cwd ~/src/repo -- "PROMPT"         # run in a repo
 claude-bridge ask --extra "--max-turns 5 --permission-mode plan" -- "..."   # any claude flag, per call
+claude-bridge ask --arg --disallowedTools --arg 'Bash(playwright-cli -s=x click:*)' -- "..."   # one argv element per --arg, nothing split
 claude-bridge spawn [--cwd DIR] NAME "PROMPT"          # background session; check later with list and logs
 claude-bridge logs ID_OR_NAME [LINES]                  # recent output of a background session
 ```

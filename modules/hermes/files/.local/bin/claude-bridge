@@ -3,6 +3,9 @@
 # Pass-through by design: no permission, tool, folder, turn or spend policy is added here.
 # Children inherit the user's own Claude Code settings. Add flags per call if you want limits:
 #   claude-bridge ask --extra "--permission-mode plan --max-turns 3" -- PROMPT
+# --extra is split on whitespace (no globbing), so use it only for simple flags. A value with
+# spaces, quotes or parentheses goes through --arg, which appends exactly one argv element:
+#   claude-bridge ask --arg --disallowedTools --arg 'Bash(playwright-cli -s=x click:*)' -- PROMPT
 # The one thing it does: headless claude needs the long-lived token sourced IN THE SAME SHELL,
 # done in a subshell so the value never reaches the caller and is never printed.
 set -uo pipefail
@@ -12,16 +15,17 @@ need jq; need claude
 cl() { ( [ -r "$ENVF" ] && . "$ENVF"; exec claude "$@" ); }
 verb="${1:-}"; shift || true
 case "$verb" in
-  ask)   # claude-bridge ask [--resume ID] [--model M] [--cwd DIR] [--extra "FLAGS"] -- PROMPT
-    resume=""; model=""; cwd="$PWD"; extra=""
+  ask)   # claude-bridge ask [--resume ID] [--model M] [--cwd DIR] [--extra "FLAGS"] [--arg VALUE]... -- PROMPT
+    resume=""; model=""; cwd="$PWD"; pass=()
     while [ $# -gt 0 ]; do case "$1" in
       --resume) resume="$2"; shift 2;; --model) model="$2"; shift 2;; --cwd) cwd="$2"; shift 2;;
-      --extra) extra="$2"; shift 2;; --) shift; break;; *) break;; esac; done
+      --extra) read -r -a w <<< "$2"; pass+=(${w[@]+"${w[@]}"}); shift 2;;
+      --arg) pass+=("$2"); shift 2;; --) shift; break;; *) break;; esac; done
     prompt="$*"; [ -z "$prompt" ] && prompt="$(cat)"
     args=(-p "$prompt" --output-format json)
     [ -n "$resume" ] && args+=(--resume "$resume"); [ -n "$model" ] && args+=(--model "$model")
-    # shellcheck disable=SC2206
-    [ -n "$extra" ] && args+=($extra)
+    # --extra words and --arg values, in the order given; the guard keeps bash 3.2 + set -u happy.
+    args+=(${pass[@]+"${pass[@]}"})
     out="$(cd "$cwd" && cl "${args[@]}" 2>/dev/null)"
     echo "$out" | jq -e '.session_id' >/dev/null 2>&1 || { jq -n --arg o "${out:0:300}" '{ok:false,error:("no JSON from claude: "+$o)}'; exit 1; }
     echo "$out" | jq '{ok:(.is_error|not),result,session_id,model:(.modelUsage|keys[0]),cost_usd:.total_cost_usd,turns:.num_turns,subtype,permission_denials:(.permission_denials // [] | map(.tool_name // .))}';;
@@ -34,5 +38,5 @@ case "$verb" in
     jq -n --arg v "$(claude --version 2>&1)" --argjson tok "$([ -r "$ENVF" ] && echo true || echo false)" \
       --argjson n "$(cl agents --json --all 2>/dev/null | jq 'length' 2>/dev/null || echo null)" \
       '{ok:true,claude:$v,token_env_readable:$tok,sessions_visible:$n,policy:"pass-through"}';;
-  *) echo 'usage: claude-bridge {ask [--resume ID] [--model M] [--cwd DIR] [--extra FLAGS] -- PROMPT|list|spawn [--cwd DIR] NAME PROMPT|logs ID [N]|doctor}' >&2; exit 2;;
+  *) echo 'usage: claude-bridge {ask [--resume ID] [--model M] [--cwd DIR] [--extra FLAGS] [--arg VALUE]... -- PROMPT|list|spawn [--cwd DIR] NAME PROMPT|logs ID [N]|doctor}' >&2; exit 2;;
 esac
