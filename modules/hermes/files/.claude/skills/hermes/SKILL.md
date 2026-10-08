@@ -22,6 +22,6 @@ hermes-bridge sessions                                 # list Hermes sessions
 Keep the `session_id` from `ask` and pass it to `--resume` for multi-turn work. Hermes holds that context, so it survives your own compaction.
 
 ## Notes
-- The model is pinned (`HERMES_BRIDGE_MODEL`, default claude-haiku-4-5-20251001) only because this install's configured default model returns 404. Set `HERMES_BRIDGE_MODEL=""` and `HERMES_BRIDGE_PROVIDER=""` to use Hermes' default once it is fixed.
+- Per-machine settings live in `~/.config/hermes-bridge/env` (not in git): `HERMES_BIN`, `HERMES_HOME`, `HERMES_BRIDGE_MODEL`, `HERMES_BRIDGE_PROVIDER`. Use it when Hermes is installed somewhere other than `~/.hermes` or signs in with a different provider. Without it the bridge uses `hermes` on PATH and pins claude-haiku-4-5-20251001 on anthropic, because this MacBook's configured default model returns 404.
 - `hermes mcp serve` is Hermes' messaging connector (conversations, messages, events). It cannot prompt the agent, so use `hermes-bridge ask` for delegation.
 - `ok:false` means the call failed; report the `error`.
