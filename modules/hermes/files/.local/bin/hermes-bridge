@@ -5,15 +5,22 @@
 # The one non-policy default: a model pin, because this install's configured default model returns 404.
 # Override with HERMES_BRIDGE_MODEL / HERMES_BRIDGE_PROVIDER, or set both to "" to use Hermes' default.
 set -uo pipefail
+# Optional machine-local settings (not in git), e.g. on a machine whose Hermes lives elsewhere:
+#   HERMES_BIN=/path/to/hermes  HERMES_HOME=/path/to/hermes-home  HERMES_BRIDGE_MODEL=""  HERMES_BRIDGE_PROVIDER=""
+CFG="${HERMES_BRIDGE_ENV:-$HOME/.config/hermes-bridge/env}"
+# shellcheck disable=SC1090
+[ -r "$CFG" ] && . "$CFG"
+HERMES="${HERMES_BIN:-hermes}"
+[ -n "${HERMES_HOME:-}" ] && export HERMES_HOME
 MODEL="${HERMES_BRIDGE_MODEL-claude-haiku-4-5-20251001}"
 PROVIDER="${HERMES_BRIDGE_PROVIDER-anthropic}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/hermes-bridge.XXXXXX")"; trap 'rm -rf "$TMP"' EXIT
 need() { command -v "$1" >/dev/null 2>&1 || { jq -n --arg e "missing dependency: $1" '{ok:false,error:$e}'; exit 3; }; }
-need jq; need hermes
+need jq; need "$HERMES"
 verb="${1:-}"; shift || true
 case "$verb" in
   status)
-    jq -n --arg v "$(hermes --version 2>/dev/null | head -1)" --arg cfg "$(hermes config get approvals.mode 2>/dev/null | tail -1)" \
+    jq -n --arg v "$("$HERMES" --version 2>/dev/null | head -1)" --arg cfg "$("$HERMES" config get approvals.mode 2>/dev/null | tail -1)" \
       '{ok:true,version:$v,approvals_mode:$cfg}';;
   ask)      # hermes-bridge ask [--resume ID] [--toolsets T] [--model M] [--extra "FLAGS"] -- PROMPT (or stdin)
     resume=""; toolsets=""; extra=""
@@ -26,14 +33,14 @@ case "$verb" in
     [ -n "$toolsets" ] && args+=(-t "$toolsets"); [ -n "$resume" ] && args+=(--resume "$resume")
     # shellcheck disable=SC2206
     [ -n "$extra" ] && args+=($extra)
-    out="$(hermes "${args[@]}" 2>"$TMP/err")"; rc=$?
+    out="$("$HERMES" "${args[@]}" 2>"$TMP/err")"; rc=$?
     if [ $rc -ne 0 ] || [ ! -s "$TMP/u.json" ] || [ "$(jq -r '.failed // false' "$TMP/u.json" 2>/dev/null)" = "true" ]; then
       jq -n --arg o "$out" --arg e "$(head -c 400 "$TMP/err")" --argjson rc "$rc" '{ok:false,rc:$rc,error:($o+" "+$e)}'; exit 1; fi
     jq -n --arg r "$out" --slurpfile u "$TMP/u.json" \
       '{ok:true,result:$r,session_id:($u[0].session_id // null),cost_usd:($u[0].total_including_auxiliary.estimated_cost_usd // $u[0].estimated_cost_usd // null),usage:$u[0]}';;
-  sessions) hermes sessions list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | jq -R -s '{ok:true,text:.}';;
+  sessions) "$HERMES" sessions list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | jq -R -s '{ok:true,text:.}';;
   doctor)
-    jq -n --argjson st "$("$0" status)" --arg skills "$(hermes skills list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -c 'enabled')" \
+    jq -n --argjson st "$("$0" status)" --arg skills "$("$HERMES" skills list 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -c 'enabled')" \
       '{ok:true,status:$st,enabled_skills:($skills|tonumber),policy:"pass-through"}';;
   *) echo 'usage: hermes-bridge {status|ask [--resume ID] [--toolsets T] [--model M] [--extra FLAGS] [--] PROMPT|sessions|doctor}' >&2; exit 2;;
 esac

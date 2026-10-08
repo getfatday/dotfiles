@@ -30,3 +30,10 @@ stow_dirs:
 #   hermes-bridge-verify         # free binary checks; --live adds two cheap model round trips
 # No credentials live in this module. Auth stays machine-local:
 #   ~/.claude/.crux-oauth-token.env (claude token) and ~/.hermes/.env (ANTHROPIC_API_KEY).
+#
+# Machine-local settings (optional, never committed): ~/.config/hermes-bridge/env
+#   HERMES_BIN=/path/to/hermes         use a Hermes installed outside ~/.local/bin
+#   HERMES_HOME=/path/to/hermes-home   use a Hermes home other than ~/.hermes
+#   HERMES_BRIDGE_MODEL=... HERMES_BRIDGE_PROVIDER=...   model/provider that machine's sign-in supports
+# hermes-bridge, hermes-bridge-setup and hermes-bridge-verify all read it.
+

@@ -9,6 +9,13 @@ set -uo pipefail
 check=0; [ "${1:-}" = "--check" ] && check=1
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 missing=0
+# Optional machine-local settings (not in git), e.g. on a machine whose Hermes lives elsewhere:
+#   HERMES_BIN=/path/to/hermes  HERMES_HOME=/path/to/hermes-home  HERMES_BRIDGE_MODEL=""  HERMES_BRIDGE_PROVIDER=""
+CFG="${HERMES_BRIDGE_ENV:-$HOME/.config/hermes-bridge/env}"
+# shellcheck disable=SC1090
+[ -r "$CFG" ] && . "$CFG"
+HERMES="${HERMES_BIN:-hermes}"
+[ -n "${HERMES_HOME:-}" ] && export HERMES_HOME
 say() { # say STEP OK DETAIL [FIX]
   local fix="${4:-}"
   printf '{"step":"%s","ok":%s,"detail":"%s"%s}\n' "$1" "$2" "$3" "${fix:+,\"fix\":\"$fix\"}"
@@ -25,17 +32,18 @@ if command -v claude >/dev/null 2>&1; then say claude true "$(ver claude)"
 else say claude false "claude not found" "rerun without --check, or: curl -fsSL https://claude.ai/install.sh | bash"; fi
 
 # 2. Hermes Agent (official installer; --non-interactive skips its setup and gateway stages)
-have_hermes() { [ -x "$HOME/.local/bin/hermes" ] || command -v hermes >/dev/null 2>&1; }
+have_hermes() { if [ -n "${HERMES_BIN:-}" ]; then [ -x "$HERMES_BIN" ]; else [ -x "$HOME/.local/bin/hermes" ] || command -v hermes >/dev/null 2>&1; fi; }
 if ! have_hermes && [ $check -eq 0 ]; then
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive >&2
   hash -r
 fi
-if have_hermes; then say hermes true "$(ver hermes)"
+if have_hermes; then say hermes true "$(ver "$HERMES")"
 else say hermes false "hermes not found" "rerun without --check, or: curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive"; fi
 
 # 3. Link the Hermes skill into Hermes' skill tree (~/.hermes is Hermes' state, never stowed)
 src="$HOME/.local/share/hermes-bridge/hermes-skills/claude-code-bridge"
-dir="$HOME/.hermes/skills/autonomous-ai-agents"
+HH="${HERMES_HOME:-$HOME/.hermes}"
+dir="$HH/skills/autonomous-ai-agents"
 link="$dir/claude-code-bridge"
 if [ ! -f "$src/SKILL.md" ]; then
   say skill-link false "$src/SKILL.md missing" "run dotm sync (module hermes needs capability hermes-host)"
@@ -45,7 +53,7 @@ elif [ -e "$link" ] && [ ! -L "$link" ]; then
   say skill-link false "$link is a real path, not touched" "move it aside, then rerun"
 elif [ $check -eq 1 ]; then
   say skill-link false "$link not linked to $src" "rerun without --check"
-elif [ -L "$dir" ] || [ -L "$HOME/.hermes/skills" ] || [ -L "$HOME/.hermes" ]; then
+elif [ -L "$dir" ] || [ -L "$HH/skills" ] || [ -L "$HH" ]; then
   say skill-link false "a parent of $link is a symlink, not touched" "make it a real directory, then rerun"
 else
   mkdir -p "$dir" && ln -sfn "$src" "$link"
@@ -57,10 +65,11 @@ fi
 tok="$HOME/.claude/.crux-oauth-token.env"
 if [ -r "$tok" ]; then say claude-token true "$tok readable"
 else say claude-token false "$tok not readable" "claude setup-token, then save it to $tok (or claude-bridge uses the normal login)"; fi
-k=ANTHROPIC_API_KEY
-n=$(grep -c "^${k}=." "$HOME/.hermes/.env" 2>/dev/null); n=${n:-0}
-if [ "$n" -gt 0 ]; then say hermes-key true "$HOME/.hermes/.env has a non-empty $k line"
-else say hermes-key false "$HOME/.hermes/.env has no non-empty $k line" "run hermes setup, or add the $k line to ~/.hermes/.env"; fi
+# Hermes credentials: any non-empty *_API_KEY line in $HH/.env, or a non-empty credential pool in $HH/auth.json
+n=$(grep -cE '^[A-Z0-9_]+_API_KEY=.' "$HH/.env" 2>/dev/null); n=${n:-0}
+p=$(jq -r '[.credential_pool // {} | to_entries[] | .value | length] | add // 0' "$HH/auth.json" 2>/dev/null); p=${p:-0}
+if [ "$n" -gt 0 ] || [ "$p" -gt 0 ]; then say hermes-credentials true "$HH: $n api-key line(s) in .env, $p pooled credential(s) in auth.json"
+else say hermes-credentials false "$HH has no provider credentials" "run hermes setup (or hermes auth) for this HERMES_HOME"; fi
 
 # 5. Summary
 if [ $missing -eq 0 ]; then echo '{"step":"summary","ok":true,"next":"hermes-bridge-verify"}'; exit 0
