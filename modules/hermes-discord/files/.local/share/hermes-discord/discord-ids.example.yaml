@@ -4,7 +4,7 @@
 # Quote every id: they are too long for YAML to treat as numbers safely.
 #
 # Nothing is applied until this file AND a bot token exist; then run: hermes-discord-setup
-detail: content-free          # content-free on the work Mac, full on the personal machine
+detail: full                  # full on both Macs (owner decision); content-free is an opt-in restriction
 guild_id: "000000000000000000"
 user_id: "000000000000000000" # your numeric user id. Only this id may drive the bot.
 control_channel: work-control # route name: the one channel the bot listens in (content-free machines)
