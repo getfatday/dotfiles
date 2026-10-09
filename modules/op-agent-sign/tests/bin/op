@@ -1,0 +1,36 @@
+#!/bin/sh
+# Fake `op` for the op-agent-sign test suite. Offline: it only reads files named by the harness.
+#   FAKE_OP_DIR        scratch dir for call counting / env dump (required)
+#   FAKE_OP_MODE       ok | crlf | empty | encrypted | slow | 429 | 401 | wrongkey   (default ok)
+#   FAKE_OP_KEY / FAKE_OP_ENC_KEY / FAKE_OP_OTHER_KEY   key files served by ok|crlf / encrypted / wrongkey
+#   FAKE_OP_DELAY      seconds to sleep before answering (concurrency tests)
+#   FAKE_OP_SLOW_SECS  how long `slow` mode sleeps (default 60)
+: "${FAKE_OP_DIR:?FAKE_OP_DIR not set}"
+printf 'call\n' >>"$FAKE_OP_DIR/op.calls"
+env | sort >"$FAKE_OP_DIR/op.env"
+printf '%s\n' "$1" >>"$FAKE_OP_DIR/op.verbs"
+if [ "${1:-}" != read ]; then
+  echo "[ERROR] fake op: only 'read' is supported" >&2
+  exit 2
+fi
+[ -z "${FAKE_OP_DELAY:-}" ] || sleep "$FAKE_OP_DELAY"
+case ${FAKE_OP_MODE:-ok} in
+  ok) cat "$FAKE_OP_KEY" ;;
+  crlf) awk '{ printf "%s\r\n", $0 }' "$FAKE_OP_KEY" ;;
+  empty) exit 0 ;;
+  encrypted) cat "$FAKE_OP_ENC_KEY" ;;
+  wrongkey) cat "$FAKE_OP_OTHER_KEY" ;;
+  slow) exec sleep "${FAKE_OP_SLOW_SECS:-60}" ;;
+  429)
+    echo "[ERROR] 2026/01/01 00:00:00 (429) Too Many Requests: rate limit exceeded for this service account" >&2
+    exit 1
+    ;;
+  401)
+    echo "[ERROR] 2026/01/01 00:00:00 (401) Unauthorized: invalid service account token (DecodeSACredentials)" >&2
+    exit 1
+    ;;
+  *)
+    echo "[ERROR] fake op: unknown FAKE_OP_MODE" >&2
+    exit 2
+    ;;
+esac

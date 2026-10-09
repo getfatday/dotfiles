@@ -1,0 +1,19 @@
+---
+# op-agent-sign module
+# A gpg.ssh.program wrapper for unattended, SIGNED git commits by agents. The signing key lives only
+# in a password manager vault; on demand it is fetched with a service account (`op read`) and piped
+# straight into a private in-memory ssh-agent. It is never written to a file, argv, env var or log.
+#
+#   op-agent-sign -Y sign ...   the git protocol (git calls this as gpg.ssh.program)
+#   op-agent-sign flush         stop the cached agent and remove its socket and lock
+#   op-agent-sign selftest      run the offline test suite (fake `op`, throwaway keys, no network)
+#   op-agent-sign version|help
+#
+# Config: ~/.config/op-agent-sign/config (mode 0600; OP_AGENT_SIGN_KEY_REF etc., see the script header).
+# Stowing this module changes nothing on its own: git is not pointed at the wrapper until you do it.
+# Verbs bootstrap/setup/doctor arrive with the next build step.
+#
+# Relies on: op (1password-cli) at run time; /usr/bin/ssh-agent, ssh-add, ssh-keygen.
+
+stow_dirs:
+  - op-agent-sign

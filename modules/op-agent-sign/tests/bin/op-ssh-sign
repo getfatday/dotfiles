@@ -1,0 +1,8 @@
+#!/bin/sh
+# Fake desktop-app signer (the OP_AGENT_SIGN_FALLBACK target). Records that it was called, then
+# signs the buffer (last argument) with the throwaway key the harness points at, like the real
+# one would via the desktop app. Offline.
+: "${FAKE_OP_DIR:?FAKE_OP_DIR not set}"
+printf 'called\n' >>"$FAKE_OP_DIR/fallback.calls"
+for _last in "$@"; do :; done
+exec /usr/bin/ssh-keygen -Y sign -n git -f "${FAKE_OP_KEY:?FAKE_OP_KEY not set}" "$_last"

@@ -1,0 +1,238 @@
+#!/bin/sh
+# op-agent-sign - gpg.ssh.program wrapper: unattended SIGNED git commits for agents.
+# The SSH signing key stays in 1Password. On a cache miss it is fetched with a service
+# account (`op read`) and piped straight into a private, in-memory ssh-agent (ssh-add -).
+# It is never written to a file, argv, env var or log.
+#   git protocol : op-agent-sign -Y sign -n git -f <pubkey> [-U] <buffer>   (any other -Y: exec ssh-keygen)
+#   verbs        : flush | selftest | version | help   (bootstrap/setup/doctor: B2)
+# Config (env overrides ~/.config/op-agent-sign/config, mode 0600): OP_AGENT_SIGN_KEY_REF,
+#   _TOKEN_FILE, _TTL (3600), _DEADLINE (20), _RUNTIME_DIR, _FALLBACK, _OP, _DEBUG, _CONFIG.
+# Test hooks: OP_AGENT_SIGN_SSH_KEYGEN (signer binary), OP_AGENT_SIGN_TESTS (selftest dir).
+# Exit codes: 0 ok, 64 usage, 69 unavailable, 70 internal, 72 key mismatch, 75 temporary,
+#   77 permissions. Fallback order: cached agent, service account, FALLBACK app signer, fail closed.
+VERSION=0.1.0-b1
+KEYS="KEY_REF TOKEN_FILE TTL DEADLINE RUNTIME_DIR FALLBACK OP DEBUG"
+WD="" CH="" TAGENT="" held=0 ERR="" RC=""
+
+say() { printf 'op-agent-sign: %s\n' "$*" >&2; }
+dbg() {
+  [ -n "${OP_AGENT_SIGN_DEBUG:-}" ] || return 0
+  printf '%s %s\n' "$(date +%s)" "$*" >>"$OP_AGENT_SIGN_DEBUG" 2>/dev/null
+  return 0
+}
+usage() {
+  cat >&2 <<'USAGE'
+usage: op-agent-sign flush | selftest | version | help
+       op-agent-sign -Y sign -n git -f <pubkey> [-U] <buffer>    (called by git as gpg.ssh.program)
+       bootstrap | setup | doctor                                 (not implemented yet, B2)
+USAGE
+}
+# Mode 0600 (no group/other bits) and owned by the caller.
+perm_ok() {
+  _o=$(ls -ldn -- "$1" 2>/dev/null) || return 1
+  # shellcheck disable=SC2086
+  set -- $_o
+  case $1 in ????------*) ;; *) return 1 ;; esac
+  [ "$3" = "$(id -u)" ]
+}
+self_path() {
+  _p=$0
+  case $_p in */*) ;; *) _p=$(command -v -- "$_p") ;; esac
+  while [ -L "$_p" ]; do
+    _l=$(readlink "$_p")
+    case $_l in /*) _p=$_l ;; *) _p=$(dirname "$_p")/$_l ;; esac
+  done
+  _d=$(cd "$(dirname "$_p")" && pwd -P) && printf '%s/%s\n' "$_d" "$(basename "$_p")"
+}
+# Config: file is sourced after a permission check; environment variables win over the file.
+load_config() {
+  CFG=${OP_AGENT_SIGN_CONFIG:-$HOME/.config/op-agent-sign/config}
+  for _k in $KEYS; do eval "e_$_k=\${OP_AGENT_SIGN_$_k-__u__}"; done
+  if [ -f "$CFG" ]; then
+    perm_ok "$CFG" || { say "config file must be mode 0600 and owned by you: $CFG (exit 77)"; exit 77; }
+    # shellcheck source=/dev/null
+    . "$CFG"
+  fi
+  _v=""
+  for _k in $KEYS; do eval "_v=\$e_$_k"; [ "$_v" = __u__ ] || eval "OP_AGENT_SIGN_$_k=\$_v"; done
+  KEY_REF=${OP_AGENT_SIGN_KEY_REF:-} TTL=${OP_AGENT_SIGN_TTL:-3600} DEADLINE=${OP_AGENT_SIGN_DEADLINE:-20}
+  RT=${OP_AGENT_SIGN_RUNTIME_DIR:-$HOME/.cache/op-agent-sign}
+  OPBIN=${OP_AGENT_SIGN_OP:-op} FB=${OP_AGENT_SIGN_FALLBACK-/Applications/1Password.app/Contents/MacOS/op-ssh-sign}
+  case $TTL$DEADLINE in *[!0-9]*) say "TTL and DEADLINE must be whole numbers (exit 64)"; exit 64 ;; esac
+  [ "$DEADLINE" -gt 0 ] || DEADLINE=20
+  [ -x "$FB" ] || FB=none
+  sock=$RT/agent.sock
+}
+kill_tree() {
+  for _c in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$_c"; done
+  kill -TERM "$1" 2>/dev/null
+}
+cleanup() {
+  [ -z "$WD" ] || kill -TERM "$WD" 2>/dev/null
+  [ -z "$CH" ] || kill_tree "$CH"
+  [ -z "$TAGENT" ] || { kill "$TAGENT" 2>/dev/null; rm -f "$sock"; }
+  [ "$held" = 0 ] || rm -rf "$RT/lock"
+  [ -z "$ERR" ] || rm -f "$ERR" "$RC"
+}
+agent_up() { "$SSHA" -l >/dev/null 2>&1; [ $? -ne 2 ]; }
+have_fp() { "$SSHA" -l 2>/dev/null | grep -qF "$fp"; }
+# Exit unless a fallback signer is configured; otherwise warn (caller then runs fb_exec "$@").
+fb_check() {
+  dbg "sign:unavailable code=$1 class=$2"
+  if [ "$FB" = none ]; then say "$3 (exit $1)"; exit "$1"; fi
+  say "warning: service-account path unavailable ($2); using op-ssh-sign"
+}
+fb_exec() { cleanup; trap - EXIT TERM INT HUP; dbg "sign:fallback"; exec "$FB" "$@"; }
+# Token from the environment (captured at start) or from the first usable token file.
+find_token() {
+  tok=$ENV_TOK
+  [ -z "$tok" ] || return 0
+  if [ -n "${OP_AGENT_SIGN_TOKEN_FILE:-}" ]; then _cands=$OP_AGENT_SIGN_TOKEN_FILE
+  else _cands="$HOME/.hermes/.op.env $HOME/.hermes/.env $HOME/.config/op-agent-sign/token.env"; fi
+  for _f in $_cands; do
+    [ -f "$_f" ] || continue
+    perm_ok "$_f" || { say "token file must be mode 0600 and owned by you: $_f (exit 77)"; exit 77; }
+    tok=$(sed -n 's/^[[:space:]]*export[[:space:]][[:space:]]*//;s/^OP_SERVICE_ACCOUNT_TOKEN=//p' "$_f" | sed -n '1p' | tr -d '\r')
+    case $tok in \"*\") tok=${tok#\"}; tok=${tok%\"} ;; \'*\') tok=${tok#\'}; tok=${tok%\'} ;; esac
+    [ -z "$tok" ] || return 0
+  done
+  return 1
+}
+# mkdir is the atomic lock; lock/pid lets waiters reclaim a lock left by a dead signer.
+lock_acquire() {
+  _n=$((DEADLINE * 5))
+  while ! mkdir "$RT/lock" 2>/dev/null; do
+    _lp=$(cat "$RT/lock/pid" 2>/dev/null)
+    if [ -n "$_lp" ] && ! kill -0 "$_lp" 2>/dev/null; then dbg "sign:stale-lock"; rm -rf "$RT/lock"; continue; fi
+    _n=$((_n - 1))
+    [ "$_n" -gt 0 ] || { say "timed out waiting for another signer (exit 75)"; exit 75; }
+    sleep 0.1
+  done
+  echo $$ >"$RT/lock/pid"
+  held=1
+}
+ensure_agent() {
+  agent_up && return 0
+  rm -f "$sock" "$RT/agent.pid"
+  if [ "$TTL" -gt 0 ]; then _o=$("$SSHAG" -s -a "$sock" -t "$TTL") || _o=""; else _o=$("$SSHAG" -s -a "$sock") || _o=""; fi
+  _p=$(printf '%s\n' "$_o" | sed -n 's/^SSH_AGENT_PID=\([0-9][0-9]*\).*/\1/p')
+  [ -n "$_p" ] || { say "could not start ssh-agent (exit 70)"; exit 70; }
+  dbg "sign:agent-started"
+  if [ "$TTL" -gt 0 ]; then echo "$_p" >"$RT/agent.pid"; else TAGENT=$_p; fi
+}
+# op read | tr | ssh-add runs in a background job so the deadline watchdog can interrupt it.
+# The token lives only in op's environment. Success is judged by the agent (no pipefail in sh).
+load_key() {
+  ERR=$RT/op.err.$$ RC=$RT/op.rc.$$
+  : >"$ERR"
+  _t=$TTL; [ "$_t" -gt 0 ] || _t=300
+  dbg "sign:fetch"
+  (
+    ( OP_SERVICE_ACCOUNT_TOKEN=$tok OP_LOAD_DESKTOP_APP_SETTINGS=false "$OPBIN" read "$KEY_REF" 2>"$ERR" </dev/null
+      echo $? >"$RC" ) | tr -d '\r' | "$SSHA" -t "$_t" - >/dev/null 2>&1
+  ) >/dev/null 2>&1 &
+  CH=$!
+  wait "$CH"
+  CH=""
+  _rc=$(cat "$RC" 2>/dev/null)
+  dbg "sign:fetched op_rc=${_rc:-none}"
+  have_fp && return 0
+  [ -n "$_rc" ] && [ "$_rc" != 0 ] || return 1
+  _m=$(tr '[:upper:]' '[:lower:]' <"$ERR")
+  case $_m in
+    *429*|*rate*limit*|*too*many*) return 75 ;;
+    *401*|*unauthorized*|*invalid*token*|*decodesacredentials*) return 69 ;;
+    *) return 70 ;;
+  esac
+}
+# Step 9: sign with the private agent. -U is always used, so a private key file next to the
+# .pub is never picked up. Run as a child (not exec) so the EXIT trap releases lock/agent.
+do_sign() {
+  [ "$hasU" = 1 ] || set -- -U "$@"
+  "$SSHK" "$@"
+  _r=$?
+  dbg "sign:done rc=$_r"
+  exit "$_r"
+}
+sign_main() {
+  umask 077
+  load_config
+  { mkdir -p "$RT" && chmod 700 "$RT"; } || { say "cannot create runtime dir $RT (exit 70)"; exit 70; }
+  [ "$TTL" -gt 0 ] || sock=$RT/agent.$$.sock
+  [ ${#sock} -le 100 ] || { say "socket path too long ($RT); set OP_AGENT_SIGN_RUNTIME_DIR (exit 70)"; exit 70; }
+  [ -s "$pub" ] || { say "public key file missing or empty: -f <file> (exit 64)"; exit 64; }
+  dbg "sign:start ttl=$TTL deadline=$DEADLINE"
+  trap cleanup EXIT
+  trap 'say "deadline of ${DEADLINE}s exceeded; nothing signed (exit 75)"; exit 75' TERM
+  trap 'exit 130' INT HUP
+  _pid=$$
+  ( trap 'kill "$_s" 2>/dev/null; exit 0' TERM; sleep "$DEADLINE" & _s=$!; wait "$_s"; kill -TERM "$_pid" 2>/dev/null ) >/dev/null 2>&1 &
+  WD=$!
+  export SSH_AUTH_SOCK="$sock" SSH_ASKPASS_REQUIRE=never
+  fp=$("$SSHK" -lf "$pub" 2>/dev/null | awk 'NR==1{print $2}')
+  [ -n "$fp" ] || { say "cannot read a public key from $pub (exit 64)"; exit 64; }
+  if have_fp; then dbg "sign:cache-hit fp=$fp"; do_sign "$@"; fi
+  if ! find_token || [ -z "$KEY_REF" ] || ! command -v "$OPBIN" >/dev/null 2>&1; then
+    fb_check 69 "no token, key reference or op" "no service-account token / OP_AGENT_SIGN_KEY_REF / op available; run op-agent-sign bootstrap"
+    fb_exec "$@"
+  fi
+  if [ "$TTL" -gt 0 ]; then
+    lock_acquire
+    if have_fp; then dbg "sign:cache-hit-after-lock fp=$fp"; do_sign "$@"; fi
+  fi
+  ensure_agent
+  load_key; _r=$?
+  case $_r in
+    75) fb_check 75 "rate limited" "rate limited by the service-account API (429); retry in about 60s"; fb_exec "$@" ;;
+    69) fb_check 69 "token rejected" "service-account token rejected; re-run op-agent-sign bootstrap"; fb_exec "$@" ;;
+    70) say "op could not read the key (exit 70); set OP_AGENT_SIGN_DEBUG=<file> for a trace"; exit 70 ;;
+    0) ;;
+    *) say "agent has no key matching the signing public key: wrong item, passphrase-protected key or empty output (exit 72)"; exit 72 ;;
+  esac
+  do_sign "$@"
+}
+do_flush() {
+  load_config
+  if [ -f "$RT/agent.pid" ]; then
+    _p=$(cat "$RT/agent.pid")
+    case $(ps -p "$_p" -o command= 2>/dev/null) in *ssh-agent*) kill "$_p" 2>/dev/null ;; esac
+  fi
+  rm -rf "$RT/agent.sock" "$RT/agent.pid" "$RT/lock"
+  echo "op-agent-sign: flushed (agent stopped, socket and lock removed)"
+}
+# Tests: $OP_AGENT_SIGN_TESTS, else <module>/tests relative to this file's realpath.
+do_selftest() {
+  _me=$(self_path) || exit 70
+  _d=$(dirname "$_me")
+  for _t in "${OP_AGENT_SIGN_TESTS:-}" "$_d/../../../tests" "$_d/../share/op-agent-sign/tests"; do
+    [ -n "$_t" ] && [ -f "$_t/run.sh" ] && exec env OP_AGENT_SIGN_BIN="$_me" sh "$_t/run.sh"
+  done
+  say "selftest: tests not found; set OP_AGENT_SIGN_TESTS=<dir containing run.sh> (exit 70)"
+  exit 70
+}
+
+SSHK=${OP_AGENT_SIGN_SSH_KEYGEN:-/usr/bin/ssh-keygen}; [ -x "$SSHK" ] || SSHK=ssh-keygen
+SSHA=/usr/bin/ssh-add; [ -x "$SSHA" ] || SSHA=ssh-add
+SSHAG=/usr/bin/ssh-agent; [ -x "$SSHAG" ] || SSHAG=ssh-agent
+case ${1:-} in
+  '') usage; exit 64 ;;
+  help|-h|--help) usage; exit 0 ;;
+  version|--version) echo "op-agent-sign $VERSION"; exit 0 ;;
+  flush) do_flush; exit 0 ;;
+  selftest) do_selftest ;;
+  bootstrap|setup|doctor) say "$1: not implemented yet (B2)"; exit 64 ;;
+  -*) ;;
+  *) say "unknown verb: $1"; usage; exit 64 ;;
+esac
+# Git protocol mode. Anything but "-Y sign" (verify, find-principals, ...) goes straight to ssh-keygen.
+is_sign=0 hasU=0 pub="" prev=""
+for a in "$@"; do
+  [ "$prev" = -Y ] && [ "$a" = sign ] && is_sign=1
+  [ "$prev" = -f ] && pub=$a
+  [ "$a" = -U ] && hasU=1
+  prev=$a
+done
+if [ "$is_sign" = 0 ]; then dbg "verify:passthrough"; exec "$SSHK" "$@"; fi
+ENV_TOK=${OP_SERVICE_ACCOUNT_TOKEN:-}
+unset OP_SERVICE_ACCOUNT_TOKEN
+sign_main "$@"
