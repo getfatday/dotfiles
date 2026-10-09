@@ -5,13 +5,41 @@
 #   FAKE_OP_KEY / FAKE_OP_ENC_KEY / FAKE_OP_OTHER_KEY   key files served by ok|crlf / encrypted / wrongkey
 #   FAKE_OP_DELAY      seconds to sleep before answering (concurrency tests)
 #   FAKE_OP_SLOW_SECS  how long `slow` mode sleeps (default 60)
+#   FAKE_OP_TOKEN      value served by `op read -n <ref>` (bootstrap tests)
+# Verbs: read <ref> | read -n <ref> | --version | whoami | item get <title> ... | service-account ratelimit
 : "${FAKE_OP_DIR:?FAKE_OP_DIR not set}"
 printf 'call\n' >>"$FAKE_OP_DIR/op.calls"
 env | sort >"$FAKE_OP_DIR/op.env"
 printf '%s\n' "$1" >>"$FAKE_OP_DIR/op.verbs"
-if [ "${1:-}" != read ]; then
-  echo "[ERROR] fake op: only 'read' is supported" >&2
-  exit 2
+case ${1:-} in
+  --version) echo "2.32.1"; exit 0 ;;
+  whoami)
+    [ "${FAKE_OP_MODE:-ok}" != 401 ] || { echo "[ERROR] (401) Unauthorized: invalid service account token" >&2; exit 1; }
+    if [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+      printf 'URL:               https://fakeacct.example.invalid\nIntegration ID:    FAKEINTEGRATION\nUser Type:         SERVICE_ACCOUNT\n'
+    else
+      printf 'URL:               https://fakeacct.example.invalid\nEmail:             tester@example.invalid\nUser ID:           FAKEUSER\n'
+    fi
+    exit 0
+    ;;
+  service-account)
+    printf 'TYPE      ACTION    LIMIT    USED    REMAINING    RESET\ntoken     write     100      0       100          never\ntoken     read      1000     1       999          1 hour from now\n'
+    exit 0
+    ;;
+  item)
+    [ "${2:-}" = get ] || exit 2
+    printf '{\n  "id": "fakeitemid0123456789",\n  "title": "%s",\n  "version": 2,\n  "vault": {\n    "id": "fakevaultid0123456789",\n    "name": "Agent"\n  },\n  "category": "SSH_KEY"\n}\n' "${3:-x}"
+    exit 0
+    ;;
+  read) ;;
+  *)
+    echo "[ERROR] fake op: unsupported verb" >&2
+    exit 2
+    ;;
+esac
+if [ "${2:-}" = -n ]; then
+  printf '%s' "${FAKE_OP_TOKEN:?FAKE_OP_TOKEN not set}"
+  exit 0
 fi
 [ -z "${FAKE_OP_DELAY:-}" ] || sleep "$FAKE_OP_DELAY"
 case ${FAKE_OP_MODE:-ok} in

@@ -1,19 +1,11 @@
 ---
-# op-agent-sign module
-# A gpg.ssh.program wrapper for unattended, SIGNED git commits by agents. The signing key lives only
-# in a password manager vault; on demand it is fetched with a service account (`op read`) and piped
-# straight into a private in-memory ssh-agent. It is never written to a file, argv, env var or log.
-#
-#   op-agent-sign -Y sign ...   the git protocol (git calls this as gpg.ssh.program)
-#   op-agent-sign flush         stop the cached agent and remove its socket and lock
-#   op-agent-sign selftest      run the offline test suite (fake `op`, throwaway keys, no network)
-#   op-agent-sign version|help
-#
-# Config: ~/.config/op-agent-sign/config (mode 0600; OP_AGENT_SIGN_KEY_REF etc., see the script header).
-# Stowing this module changes nothing on its own: git is not pointed at the wrapper until you do it.
-# Verbs bootstrap/setup/doctor arrive with the next build step.
-#
-# Relies on: op (1password-cli) at run time; /usr/bin/ssh-agent, ssh-add, ssh-keygen.
-
+# op-agent-sign — unattended SIGNED git commits for agents. The SSH signing key stays in 1Password and is
+# fetched with a 1Password SERVICE ACCOUNT by a gpg.ssh.program wrapper into an in-memory ssh-agent (TTL).
+# No private key on disk, no Keychain, no dependency on the 1Password desktop app being unlocked.
+# Relies on: 1password (op CLI cask), git. Machine-local, never committed:
+#   ~/.config/op-agent-sign/config      OP_AGENT_SIGN_KEY_REF (op:// by IDs), optional TTL/DEADLINE/TOKEN_FILE
+#   <token file> (default ~/.hermes/.op.env)  OP_SERVICE_ACCOUNT_TOKEN=…  written by `op-agent-sign bootstrap`
+# After `dotm sync` run once:  op-agent-sign setup && op-agent-sign bootstrap && op-agent-sign doctor
+requires: [macos]
 stow_dirs:
   - op-agent-sign

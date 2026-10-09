@@ -1,18 +1,20 @@
 #!/bin/sh
+# shellcheck disable=SC2030,SC2031
 # op-agent-sign - gpg.ssh.program wrapper: unattended SIGNED git commits for agents.
 # The SSH signing key stays in 1Password. On a cache miss it is fetched with a service
 # account (`op read`) and piped straight into a private, in-memory ssh-agent (ssh-add -).
 # It is never written to a file, argv, env var or log.
 #   git protocol : op-agent-sign -Y sign -n git -f <pubkey> [-U] <buffer>   (any other -Y: exec ssh-keygen)
-#   verbs        : flush | selftest | version | help   (bootstrap/setup/doctor: B2)
+#   verbs        : bootstrap | setup | doctor | flush | selftest | version | help
+#                  (bootstrap/setup print JSON lines of names and booleans, never values)
 # Config (env overrides ~/.config/op-agent-sign/config, mode 0600): OP_AGENT_SIGN_KEY_REF,
 #   _TOKEN_FILE, _TTL (3600), _DEADLINE (20), _RUNTIME_DIR, _FALLBACK, _OP, _DEBUG, _CONFIG.
 # Test hooks: OP_AGENT_SIGN_SSH_KEYGEN (signer binary), OP_AGENT_SIGN_TESTS (selftest dir).
 # Exit codes: 0 ok, 64 usage, 69 unavailable, 70 internal, 72 key mismatch, 75 temporary,
 #   77 permissions. Fallback order: cached agent, service account, FALLBACK app signer, fail closed.
-VERSION=0.1.0-b1
+VERSION=0.2.0-b2
 KEYS="KEY_REF TOKEN_FILE TTL DEADLINE RUNTIME_DIR FALLBACK OP DEBUG"
-WD="" CH="" TAGENT="" held=0 ERR="" RC=""
+WD="" CH="" TAGENT="" held=0 ERR="" RC="" SOFT="" INFO=0 TAB=$(printf '\t')
 
 say() { printf 'op-agent-sign: %s\n' "$*" >&2; }
 dbg() {
@@ -24,7 +26,10 @@ usage() {
   cat >&2 <<'USAGE'
 usage: op-agent-sign flush | selftest | version | help
        op-agent-sign -Y sign -n git -f <pubkey> [-U] <buffer>    (called by git as gpg.ssh.program)
-       bootstrap | setup | doctor                                 (not implemented yet, B2)
+       op-agent-sign setup [--check]
+       op-agent-sign bootstrap [--token-ref REF] [--key-item TITLE] [--vault NAME] [--token-file PATH]
+                               [--yes] [--no-hermes-git-env]      (interactive: needs a terminal)
+       op-agent-sign doctor [--offline] [--json] [--commit-test]
 USAGE
 }
 # Mode 0600 (no group/other bits) and owned by the caller.
@@ -48,10 +53,13 @@ self_path() {
 load_config() {
   CFG=${OP_AGENT_SIGN_CONFIG:-$HOME/.config/op-agent-sign/config}
   for _k in $KEYS; do eval "e_$_k=\${OP_AGENT_SIGN_$_k-__u__}"; done
+  CFG_BAD=0
   if [ -f "$CFG" ]; then
-    perm_ok "$CFG" || { say "config file must be mode 0600 and owned by you: $CFG (exit 77)"; exit 77; }
-    # shellcheck source=/dev/null
-    . "$CFG"
+    if perm_ok "$CFG"; then
+      # shellcheck source=/dev/null
+      . "$CFG"
+    elif [ -n "$SOFT" ]; then CFG_BAD=1
+    else say "config file must be mode 0600 and owned by you: $CFG (exit 77)"; exit 77; fi
   fi
   _v=""
   for _k in $KEYS; do eval "_v=\$e_$_k"; [ "$_v" = __u__ ] || eval "OP_AGENT_SIGN_$_k=\$_v"; done
@@ -84,17 +92,21 @@ fb_check() {
 }
 fb_exec() { cleanup; trap - EXIT TERM INT HUP; dbg "sign:fallback"; exec "$FB" "$@"; }
 # Token from the environment (captured at start) or from the first usable token file.
+# SOFT=1 (doctor/bootstrap): a file with bad permissions is reported (TOKFILE=it, return 2), not fatal.
 find_token() {
-  tok=$ENV_TOK
+  tok=$ENV_TOK TOKFILE=""
   [ -z "$tok" ] || return 0
   if [ -n "${OP_AGENT_SIGN_TOKEN_FILE:-}" ]; then _cands=$OP_AGENT_SIGN_TOKEN_FILE
   else _cands="$HOME/.hermes/.op.env $HOME/.hermes/.env $HOME/.config/op-agent-sign/token.env"; fi
   for _f in $_cands; do
     [ -f "$_f" ] || continue
-    perm_ok "$_f" || { say "token file must be mode 0600 and owned by you: $_f (exit 77)"; exit 77; }
+    if ! perm_ok "$_f"; then
+      [ -z "$SOFT" ] || { TOKFILE=$_f; return 2; }
+      say "token file must be mode 0600 and owned by you: $_f (exit 77)"; exit 77
+    fi
     tok=$(sed -n 's/^[[:space:]]*export[[:space:]][[:space:]]*//;s/^OP_SERVICE_ACCOUNT_TOKEN=//p' "$_f" | sed -n '1p' | tr -d '\r')
     case $tok in \"*\") tok=${tok#\"}; tok=${tok%\"} ;; \'*\') tok=${tok#\'}; tok=${tok%\'} ;; esac
-    [ -z "$tok" ] || return 0
+    [ -z "$tok" ] || { TOKFILE=$_f; return 0; }
   done
   return 1
 }
@@ -211,16 +223,329 @@ do_selftest() {
   exit 70
 }
 
+# ---- verbs: bootstrap | setup | doctor. JSON lines (doctor: marks unless --json) of names and booleans; never values. ----
+jesc() { printf '%s' "$1" | tr -d '\000-\037' | sed 's/\\/\\\\/g;s/"/\\"/g'; }
+tilde() { case $1 in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
+mask() { printf '%.4s...' "$1"; }
+# emit name ok detail [fix]: a false result counts as a failure unless INFO=1 (informational check).
+emit() {
+  [ "$2" = true ] || [ "$INFO" = 1 ] || BAD=$((BAD + 1))
+  if [ "$JSON" = 1 ]; then
+    _x=""
+    [ "$INFO" != 1 ] || _x=',"info":true'
+    [ -z "${4:-}" ] || _x="$_x,\"fix\":\"$(jesc "$4")\""
+    printf '{"%s":"%s","ok":%s,"detail":"%s"%s}\n' "$K" "$1" "$2" "$(jesc "$3")" "$_x"
+  else
+    _m="✓"
+    if [ "$2" != true ]; then _m="✗"; [ "$INFO" != 1 ] || _m="-"; fi
+    printf '%s %-18s %s%s\n' "$_m" "$1" "$3" "${4:+  (fix: $4)}"
+  fi
+}
+emit_i() { INFO=1; emit "$@"; INFO=0; }
+finish() { # $1 = next step; returns 0 iff nothing failed
+  if [ "$BAD" = 0 ]; then _b=true; else _b=false; fi
+  if [ "$JSON" = 1 ]; then printf '{"%s":"summary","ok":%s,"failed":%s,"next":"%s"}\n' "$K" "$_b" "$BAD" "$(jesc "$1")"
+  elif [ "$BAD" = 0 ]; then echo "all checks passed"
+  else echo "$BAD check(s) failed"; fi
+  [ "$BAD" = 0 ]
+}
+stop() { finish "$1"; exit "$2"; }
+# bounded SECS cmd...: run cmd, kill it and its children after SECS seconds.
+bounded() {
+  _bs=$1; shift
+  "$@" & _bp=$!
+  ( sleep "$_bs"; kill_tree "$_bp" ) >/dev/null 2>&1 & _bw=$!
+  wait "$_bp"; _br=$?
+  kill_tree "$_bw" 2>/dev/null
+  return "$_br"
+}
+ensure_dir() { [ -d "$1" ] || { mkdir -p "$1" && chmod 700 "$1"; }; }
+# gget KEY: "<origin><TAB><value>" of the effective git value, from $GITOUT (git config --show-origin output)
+gget() { printf '%s\n' "$GITOUT" | awk -F'\t' -v k="$1" '{ i = index($2, " "); if (substr($2, 1, i - 1) == k) { o = $1; v = substr($2, i + 1) } } END { if (o != "") print o "\t" v }'; }
+# exp_fp VALUE: fingerprint (EFP) of a user.signingkey value (key::<pub>, literal pub key, or a file)
+exp_fp() {
+  EFP="" _l="" _f=""
+  case $1 in
+    '') return 1 ;;
+    key::*) _l=${1#key::} ;;
+    ssh-*|ecdsa-*|sk-*) _l=$1 ;;
+    \~/*) _f=$HOME/${1#\~/} ;;
+    *) _f=$1 ;;
+  esac
+  if [ -n "$_l" ]; then EFP=$(printf '%s\n' "$_l" | "$SSHK" -lf /dev/stdin 2>/dev/null | awk 'NR==1{print $2}')
+  else EFP=$("$SSHK" -lf "$_f" 2>/dev/null | awk 'NR==1{print $2}'); fi
+  [ -n "$EFP" ]
+}
+# sa_probe: fetch $KEY_REF with the service account ($tok) into a throwaway agent; true iff it holds $EFP.
+sa_probe() {
+  _ps=$RT/chk.$$.sock
+  _po=$("$SSHAG" -s -a "$_ps" -t 60 2>/dev/null) || return 2
+  _pp=$(printf '%s\n' "$_po" | sed -n 's/^SSH_AGENT_PID=\([0-9][0-9]*\).*/\1/p')
+  (
+    OP_SERVICE_ACCOUNT_TOKEN=$tok OP_LOAD_DESKTOP_APP_SETTINGS=false
+    export OP_SERVICE_ACCOUNT_TOKEN OP_LOAD_DESKTOP_APP_SETTINGS
+    bounded "$DEADLINE" "$OPBIN" read "$KEY_REF" 2>/dev/null | tr -d '\r' | SSH_AUTH_SOCK=$_ps "$SSHA" -t 30 - >/dev/null 2>&1
+  )
+  SSH_AUTH_SOCK=$_ps "$SSHA" -l 2>/dev/null | grep -qF "$EFP"; _pr=$?
+  [ -z "$_pp" ] || kill "$_pp" 2>/dev/null
+  rm -f "$_ps"
+  return "$_pr"
+}
+# cfg_set KEY VALUE: replace-or-append OP_AGENT_SIGN_<KEY> in the 0600 config file (empty VALUE removes it)
+cfg_set() {
+  ensure_dir "$(dirname "$CFG")" || return 1
+  _ct=$(dirname "$CFG")/.tmp.$$
+  { [ ! -f "$CFG" ] || grep -v "^OP_AGENT_SIGN_$1=" "$CFG"; [ -z "$2" ] || printf 'OP_AGENT_SIGN_%s="%s"\n' "$1" "$2"; } >"$_ct" &&
+    chmod 600 "$_ct" && mv -f "$_ct" "$CFG"
+}
+# upsert_env FILE SPEC: SPEC is NAME=VALUE lines separated by newlines. Replace the first line that sets each
+# NAME (a later duplicate is dropped), append missing ones; every other line is copied unchanged. The result is
+# built in a 0600 temp file next to FILE and moved over it. Values travel through awk's environment, not argv.
+upsert_env() {
+  _uf=$1 _ut=$(dirname "$1")/.tmp.$$ _ui=$1
+  [ -f "$_uf" ] || _ui=/dev/null
+  if SPEC=$2 awk '
+    BEGIN { n = split(ENVIRON["SPEC"], L, "\n"); for (i = 1; i <= n; i++) { O[i] = substr(L[i], 1, index(L[i], "=") - 1); V[O[i]] = L[i] } }
+    { s = $0; sub(/^[ \t]*(export[ \t]+)?/, "", s); e = index(s, "="); k = (e > 1) ? substr(s, 1, e - 1) : ""
+      if (k != "" && (k in V)) { if (!(k in D)) { print V[k]; D[k] = 1 } next }
+      print }
+    END { for (i = 1; i <= n; i++) if (!(O[i] in D)) print V[O[i]] }' "$_ui" >"$_ut" &&
+    chmod 600 "$_ut" && mv -f "$_ut" "$_uf"; then return 0; fi
+  rm -f "$_ut"
+  return 1
+}
+
+setup_dir() { # NAME PATH
+  if [ -d "$2" ] && perm_ok "$2"; then emit "$1" true "$(tilde "$2") mode 0700"; return; fi
+  if [ "$CK" = 1 ]; then emit "$1" false "$(tilde "$2") missing or not mode 0700" "run op-agent-sign setup"; return; fi
+  case $2 in */op-agent-sign) ;; *) [ ! -d "$2" ] || { emit "$1" false "$(tilde "$2") exists with other permissions; not touched" "chmod 700 it"; return; } ;; esac
+  if mkdir -p "$2" && chmod 700 "$2"; then emit "$1" true "$(tilde "$2") mode 0700 (created or fixed)"
+  else emit "$1" false "cannot create $(tilde "$2")"; fi
+}
+do_setup() {
+  K=step JSON=1 BAD=0 CK=0 SOFT=1
+  for _a in "$@"; do case $_a in --check) CK=1 ;; *) say "setup: unknown option $_a (exit 64)"; exit 64 ;; esac; done
+  umask 022
+  load_config
+  setup_dir config_dir "$HOME/.config/op-agent-sign"
+  setup_dir runtime_dir "$RT"
+  _src=$HOME/.local/share/op-agent-sign/hermes-skills/op-agent-sign _hh=${HERMES_HOME:-$HOME/.hermes}
+  _lk=$_hh/skills/security/op-agent-sign
+  if [ ! -d "$HOME/.hermes" ]; then emit_i hermes_skill true "no ~/.hermes; nothing to link"
+  elif [ ! -f "$_src/SKILL.md" ]; then emit_i hermes_skill false "skill source $(tilde "$_src") not installed yet" "run dotm sync once the module ships the skill"
+  elif [ -L "$_lk" ] && [ "$(readlink "$_lk")" = "$_src" ]; then emit hermes_skill true "$(tilde "$_lk") -> $(tilde "$_src")"
+  elif [ -e "$_lk" ] || [ -L "$_lk" ]; then emit hermes_skill false "$(tilde "$_lk") exists and is not our link; not touched" "move it aside, then rerun"
+  elif [ "$CK" = 1 ]; then emit hermes_skill false "$(tilde "$_lk") not linked" "run op-agent-sign setup"
+  elif [ -L "$_hh" ] || [ -L "$_hh/skills" ]; then emit hermes_skill false "$(tilde "$_hh") or its skills dir is a symlink; not touched" "make it a real directory, then rerun"
+  elif mkdir -p "$_hh/skills/security" && ln -sfn "$_src" "$_lk"; then emit hermes_skill true "$(tilde "$_lk") -> $(tilde "$_src") (linked)"
+  else emit hermes_skill false "could not link $(tilde "$_lk")"; fi
+  _cs=$HOME/.claude/skills/op-agent-sign/SKILL.md
+  if [ -f "$_cs" ]; then emit_i claude_skill true "$(tilde "$_cs") present"
+  else emit_i claude_skill false "$(tilde "$_cs") not found" "run dotm sync once the module ships the skill"; fi
+  stop "op-agent-sign bootstrap --token-ref <ref> --key-item <title>, then op-agent-sign doctor" $((BAD > 0))
+}
+
+do_doctor() {
+  JSON=0 OFF=0 CT=0
+  for _a in "$@"; do case $_a in --json) JSON=1 ;; --offline) OFF=1 ;; --commit-test) CT=1 ;; *) say "doctor: unknown option $_a (exit 64)"; exit 64 ;; esac; done
+  K=check BAD=0 SOFT=1
+  load_config
+  CALLER_SOCK=${SSH_AUTH_SOCK:-}
+  export SSH_AUTH_SOCK="$sock" SSH_ASKPASS_REQUIRE=never
+  GITOUT=$(git config --show-origin --get-regexp '^(gpg\.ssh\.(program|allowedsignersfile)|user\.signingkey)$' 2>/dev/null)
+  # 1 binaries (op is not executed with --offline)
+  if ! command -v "$OPBIN" >/dev/null 2>&1; then emit op false "op not found ($OPBIN)" "install the 1password-cli package (dotm module 1password)"
+  elif [ "$OFF" = 1 ]; then emit op true "present; version not queried offline"
+  else emit op true "version $(bounded 10 "$OPBIN" --version 2>/dev/null | sed -n 1p)"; fi
+  _miss=""
+  for _b in "$SSHK" "$SSHA" "$SSHAG" git; do command -v "$_b" >/dev/null 2>&1 || _miss="$_miss $_b"; done
+  # shellcheck disable=SC2046
+  set -- $(ssh -V 2>&1 | sed -n 's/^OpenSSH_\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')
+  if [ -n "$_miss" ]; then emit tools false "missing:$_miss"
+  elif [ -z "${1:-}" ] || [ "$1" -lt 8 ] || { [ "$1" -eq 8 ] && [ "${2:-0}" -lt 2 ]; }; then emit tools false "OpenSSH 8.2 or newer is required for -Y sign"
+  else emit tools true "OpenSSH $1.$2, ssh-agent, ssh-add, ssh-keygen, git"; fi
+  # 2 config file and key reference
+  if [ "$CFG_BAD" = 1 ]; then emit config false "$(tilde "$CFG") must be mode 0600 and owned by you" "chmod 600 it"
+  elif [ -f "$CFG" ]; then emit config true "$(tilde "$CFG") mode 0600"
+  else emit config false "$(tilde "$CFG") missing" "run op-agent-sign bootstrap"; fi
+  if printf '%s' "$KEY_REF" | grep -Eq '^op://[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/private_key\?ssh-format=openssh$'; then
+    _v=${KEY_REF#op://} _r=${KEY_REF#op://*/}
+    emit key_ref true "vault $(mask "${_v%%/*}") item $(mask "${_r%%/*}")"
+  else emit key_ref false "OP_AGENT_SIGN_KEY_REF missing or malformed (want op://<vaultID>/<itemID>/private_key?ssh-format=openssh)" "run op-agent-sign bootstrap --key-item <title>"; fi
+  # 3 token file
+  find_token; _tr=$?
+  if [ "$_tr" = 2 ]; then emit token_file false "$(tilde "$TOKFILE") must be mode 0600 and owned by you" "chmod 600 it"
+  elif [ "$_tr" = 0 ] && [ -n "$TOKFILE" ]; then emit token_file true "$(tilde "$TOKFILE") mode 0600, OP_SERVICE_ACCOUNT_TOKEN present: true"
+  elif [ "$_tr" = 0 ]; then emit token_file true "token comes from the environment; no file consulted"
+  else emit token_file false "no token file defines OP_SERVICE_ACCOUNT_TOKEN (checked ~/.hermes/.op.env, ~/.hermes/.env, ~/.config/op-agent-sign/token.env)" "run op-agent-sign bootstrap"; fi
+  # 4 runtime dir and agent
+  if [ -d "$RT" ] && perm_ok "$RT"; then emit runtime_dir true "$(tilde "$RT") mode 0700"
+  else emit runtime_dir false "$(tilde "$RT") missing or not mode 0700" "run op-agent-sign setup"; fi
+  if [ ! -S "$sock" ]; then emit_i agent true "not running (it starts on the first signature)"
+  elif agent_up; then emit agent true "running, $("$SSHA" -l 2>/dev/null | grep -c SHA256) key(s) cached"
+  else emit agent false "stale socket: agent process is gone" "op-agent-sign flush"; fi
+  # 7 git routing, allowed_signers, signing key (read from git config; env GIT_CONFIG_* counts as command line)
+  _r=$(gget gpg.ssh.program) _prog=${_r#*"$TAB"} _org=${_r%%"$TAB"*}
+  case $_prog in */op-agent-sign|op-agent-sign) emit git_routing true "routed: true, gpg.ssh.program=$(basename "$_prog"), origin: ${_org%%:*}" ;;
+    *) emit git_routing false "routed: false (gpg.ssh.program is ${_prog:-unset}); agents need GIT_CONFIG_* env or git -c gpg.ssh.program=op-agent-sign" ;; esac
+  _r=$(gget gpg.ssh.allowedsignersfile) _as=${_r#*"$TAB"}
+  case $_as in \~/*) _as=$HOME/${_as#\~/} ;; '') _as=$HOME/.config/op-agent-sign/allowed_signers ;; esac
+  if [ -s "$_as" ]; then emit allowed_signers true "$(tilde "$_as") present"
+  else emit allowed_signers false "$(tilde "$_as") missing or empty" "run dotm sync"; fi
+  _sk=$(gget user.signingkey); _sk=${_sk#*"$TAB"}
+  # 5/6 service account and key reachability
+  if [ "$OFF" = 1 ]; then
+    emit_i sa_auth true "skipped (--offline)"; emit_i key_reachable true "skipped (--offline)"
+  elif [ "$_tr" != 0 ]; then
+    emit_i sa_auth true "skipped (no token)"; emit_i key_reachable true "skipped (no token)"
+  else
+    _w=$( ( OP_SERVICE_ACCOUNT_TOKEN=$tok OP_LOAD_DESKTOP_APP_SETTINGS=false; export OP_SERVICE_ACCOUNT_TOKEN OP_LOAD_DESKTOP_APP_SETTINGS
+            bounded 15 "$OPBIN" whoami 2>/dev/null ) ); _wr=$?
+    case $_wr:$_w in
+      0:*[Ss][Ee][Rr][Vv][Ii][Cc][Ee]*) _h=$(printf '%s\n' "$_w" | sed -n 's/^URL:[[:space:]]*//p;' | sed -n 's#^[a-z]*://##;1s#/.*##p')
+        emit sa_auth true "type: service account, host $(mask "$_h")" ;;
+      *) emit sa_auth false "op whoami with the token did not report a service account" "run op-agent-sign bootstrap" ;;
+    esac
+    _w=$( ( OP_SERVICE_ACCOUNT_TOKEN=$tok; export OP_SERVICE_ACCOUNT_TOKEN; bounded 15 "$OPBIN" service-account ratelimit 2>/dev/null ) | tr -s ' \n\t' ' ')
+    emit_i ratelimit true "${_w:-not available}"
+    if ! exp_fp "$_sk"; then emit key_reachable false "cannot compare: user.signingkey is unset or unreadable (set it, or inject GIT_CONFIG_* env)"
+    elif [ -d "$RT" ] && sa_probe; then emit key_reachable true "match: true"
+    else emit key_reachable false "match: false (key not readable with the service account, or differs from user.signingkey)" "check the item and vault scope, then op-agent-sign bootstrap"; fi
+  fi
+  # 8 informational
+  if [ "$FB" != none ]; then emit_i fallback true "desktop-app signer present"; else emit_i fallback true "none (desktop-app signer disabled or absent)"; fi
+  if [ -n "$CALLER_SOCK" ]; then emit_i caller_ssh_auth_sock true "set in the caller (ignored: the wrapper uses its own agent)"; else emit_i caller_ssh_auth_sock true "unset"; fi
+  if command -v hermes >/dev/null 2>&1; then
+    if [ "$OFF" = 1 ]; then emit_i hermes_onepassword true "skipped (--offline)"
+    elif bounded 30 hermes secrets onepassword status >/dev/null 2>&1; then emit_i hermes_onepassword true "hermes secrets onepassword status: auth OK"
+    else emit_i hermes_onepassword false "hermes secrets onepassword status: auth FAIL"; fi
+  else emit_i hermes_onepassword true "hermes not installed"; fi
+  # 9 end-to-end signed commit in a throwaway repo
+  if [ "$CT" = 1 ]; then
+    _me=$(self_path); _pr=$(awk 'NR==1{print $1}' "$_as" 2>/dev/null)
+    _d=$(mktemp -d "$RT/ct.XXXXXX" 2>/dev/null)
+    if [ -z "$_d" ] || [ -z "$_sk" ] || [ -z "$_pr" ]; then emit commit_test false "needs the runtime dir, user.signingkey and an allowed_signers principal"
+    else
+      if ( cd "$_d" || exit 1
+           unset GIT_CONFIG_COUNT
+           export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+           [ -z "$ENV_TOK" ] || export OP_SERVICE_ACCOUNT_TOKEN="$ENV_TOK"
+           git init -q . &&
+           git -c user.name=op-agent-sign -c "user.email=$_pr" -c "user.signingkey=$_sk" -c gpg.format=ssh -c "gpg.ssh.program=$_me" commit -S -q --allow-empty -m commit-test &&
+           git -c gpg.format=ssh -c "gpg.ssh.allowedSignersFile=$_as" verify-commit HEAD &&
+           [ "$(git -c gpg.format=ssh -c "gpg.ssh.allowedSignersFile=$_as" log -1 --format=%G?)" = G ] ) >/dev/null 2>&1
+      then emit commit_test true "signed commit verified (%G? = G)"
+      else emit commit_test false "signed test commit failed or did not verify" "set OP_AGENT_SIGN_DEBUG=<file> and retry"; fi
+      rm -rf "$_d"
+    fi
+  fi
+  finish "" && exit 0
+  exit 1
+}
+
+do_bootstrap() {
+  K=step JSON=1 BAD=0 SOFT=1 TREF="" KITEM="" TFILE="" YES=0 HGE=1 VAULT=Agent
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --yes) YES=1 ;;
+      --no-hermes-git-env) HGE=0 ;;
+      --token-ref|--key-item|--vault|--token-file)
+        [ $# -ge 2 ] || { say "bootstrap: $1 needs a value (exit 64)"; exit 64; }
+        case $1 in --token-ref) TREF=$2 ;; --key-item) KITEM=$2 ;; --vault) VAULT=$2 ;; *) TFILE=$2 ;; esac
+        shift ;;
+      *) say "bootstrap: unknown option $1 (exit 64)"; exit 64 ;;
+    esac
+    shift
+  done
+  umask 077
+  load_config
+  [ -n "$TFILE" ] || TFILE=${OP_AGENT_SIGN_TOKEN_FILE:-}
+  if [ -z "$TFILE" ]; then
+    if [ -d "$HOME/.hermes" ]; then TFILE=$HOME/.hermes/.op.env; else TFILE=$HOME/.config/op-agent-sign/token.env; fi
+  fi
+  case $TFILE$TREF$KITEM$VAULT in *[\"\$\`\\]*) emit preflight false "values may not contain quotes, dollar signs, backticks or backslashes"; stop "" 64 ;; esac
+  if [ -n "$ENV_TOK" ]; then emit preflight false "OP_SERVICE_ACCOUNT_TOKEN is set in this environment; unset it so op uses the desktop app"; stop "" 64; fi
+  if [ ! -t 0 ]; then emit preflight false "bootstrap is interactive and needs a terminal"; stop "" 64; fi
+  if { [ -z "$TREF" ] && ! find_token; } || { [ -z "$KITEM" ] && [ -z "$KEY_REF" ]; }; then
+    emit preflight false "need --token-ref (no token file yet) and --key-item (no key reference configured yet)"; stop "" 64
+  fi
+  if [ "$YES" != 1 ]; then
+    printf 'op-agent-sign: token file %s, config %s; continue? [y/N] ' "$(tilde "$TFILE")" "$(tilde "$CFG")" >&2
+    read -r _ans
+    case $_ans in y|Y|yes) ;; *) emit confirm false "declined"; stop "" 1 ;; esac
+  fi
+  if bounded 120 "$OPBIN" whoami >/dev/null 2>&1; then emit whoami true "op reachable through the desktop app integration"
+  else emit whoami false "op whoami failed" "unlock the 1Password app and enable its CLI integration"; stop "" 69; fi
+  if [ -n "$TREF" ]; then
+    tok=$(bounded 120 "$OPBIN" read -n "$TREF" 2>/dev/null)
+    case $tok in ''|*[[:space:]]*) tok=""; emit token false "token reference unreadable or not a single line" "check --token-ref and approve the app prompt"; stop "" 69 ;; esac
+    emit token true "read from the reference (held in memory only)"
+    _td=$(dirname "$TFILE")
+    ensure_dir "$_td"
+    case $TFILE in
+      */.env) upsert_env "$TFILE" "OP_SERVICE_ACCOUNT_TOKEN=$tok" ;;
+      *) printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$tok" >"$_td/.tmp.$$" && chmod 600 "$_td/.tmp.$$" && mv -f "$_td/.tmp.$$" "$TFILE" ;;
+    esac
+    tok=""
+    if perm_ok "$TFILE" && grep -q '^OP_SERVICE_ACCOUNT_TOKEN=' "$TFILE"; then emit token_file true "$(tilde "$TFILE") written, mode 0600"
+    else rm -f "$_td/.tmp.$$"; emit token_file false "could not write $(tilde "$TFILE")"; stop "" 70; fi
+    _first=""
+    for _c in "$HOME/.hermes/.op.env" "$HOME/.hermes/.env" "$HOME/.config/op-agent-sign/token.env"; do
+      [ -f "$_c" ] && { _first=$_c; break; }
+    done
+    if [ "$_first" = "$TFILE" ]; then cfg_set TOKEN_FILE ""; else cfg_set TOKEN_FILE "$TFILE"; fi
+  fi
+  if [ -n "$KITEM" ]; then
+    _j=$(bounded 120 "$OPBIN" item get "$KITEM" --vault "$VAULT" --format json 2>/dev/null)
+    if command -v jq >/dev/null 2>&1; then _vid=$(printf '%s' "$_j" | jq -r '.vault.id // empty' 2>/dev/null) _iid=$(printf '%s' "$_j" | jq -r '.id // empty' 2>/dev/null)
+    else
+      _c=$(printf '%s' "$_j" | tr -d ' \n\t')
+      _vid=$(printf '%s' "$_c" | sed -n 's/.*"vault":{"id":"\([A-Za-z0-9]*\)".*/\1/p') _iid=$(printf '%s' "$_c" | sed -n 's/^{"id":"\([A-Za-z0-9]*\)".*/\1/p')
+    fi
+    case $_vid$_iid in ''|*[!A-Za-z0-9]*) emit key_ref false "could not resolve the item's vault and item IDs" "check --key-item and --vault"; stop "" 69 ;; esac
+    cfg_set KEY_REF "op://$_vid/$_iid/private_key?ssh-format=openssh"
+    emit key_ref true "wrote vault $(mask "$_vid") item $(mask "$_iid") to $(tilde "$CFG")"
+  fi
+  SOFT=1 load_config
+  if ! find_token; then emit validate false "no usable token file after bootstrap"; stop "" 69; fi
+  ensure_dir "$RT"
+  if ! exp_fp "$(git config user.signingkey 2>/dev/null)"; then
+    emit validate false "user.signingkey is unset or unreadable; rerun with GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.signingkey GIT_CONFIG_VALUE_0=key::<agent public key> in the environment"
+  elif sa_probe; then emit validate true "match: true"
+  else emit validate false "match: false (the service account could not read the key, or it differs from user.signingkey)" "check the item, vault scope and --vault"; fi
+  _ge=$HOME/.hermes/.env
+  if [ "$HGE" = 0 ] || [ ! -d "$HOME/.hermes" ]; then emit_i hermes_git_env true "skipped"
+  else
+    _n=$(sed -n 's/^GIT_CONFIG_COUNT=//p' "$_ge" 2>/dev/null | tail -n 1)
+    _k0=$(sed -n 's/^GIT_CONFIG_KEY_0=//p' "$_ge" 2>/dev/null | tail -n 1) _k1=$(sed -n 's/^GIT_CONFIG_KEY_1=//p' "$_ge" 2>/dev/null | tail -n 1)
+    if [ -n "$_n$_k0$_k1" ] && { [ "$_n" != 2 ] || [ "$_k0" != gpg.ssh.program ] || [ "$_k1" != gpg.ssh.allowedSignersFile ]; }; then
+      emit hermes_git_env false "$(tilde "$_ge") already has other GIT_CONFIG_* lines; left untouched" "merge by hand or use git -c gpg.ssh.program=op-agent-sign"
+    elif upsert_env "$_ge" "GIT_CONFIG_COUNT=2
+GIT_CONFIG_KEY_0=gpg.ssh.program
+GIT_CONFIG_VALUE_0=$HOME/.local/bin/op-agent-sign
+GIT_CONFIG_KEY_1=gpg.ssh.allowedSignersFile
+GIT_CONFIG_VALUE_1=$HOME/.config/op-agent-sign/allowed_signers"; then emit hermes_git_env true "GIT_CONFIG_* lines written to $(tilde "$_ge") (absolute paths); run: hermes gateway restart"
+    else emit hermes_git_env false "could not update $(tilde "$_ge")"; fi
+  fi
+  (do_doctor --json); _dr=$?
+  if [ "$_dr" = 0 ]; then emit_i doctor true "doctor passed"; else emit_i doctor false "doctor reported failures (a plain shell is not routed to the wrapper; see the git_routing line)"; fi
+  stop "hermes gateway restart, then op-agent-sign doctor --commit-test" $((BAD > 0))
+}
+
 SSHK=${OP_AGENT_SIGN_SSH_KEYGEN:-/usr/bin/ssh-keygen}; [ -x "$SSHK" ] || SSHK=ssh-keygen
 SSHA=/usr/bin/ssh-add; [ -x "$SSHA" ] || SSHA=ssh-add
 SSHAG=/usr/bin/ssh-agent; [ -x "$SSHAG" ] || SSHAG=ssh-agent
+ENV_TOK=${OP_SERVICE_ACCOUNT_TOKEN:-}
+unset OP_SERVICE_ACCOUNT_TOKEN
 case ${1:-} in
   '') usage; exit 64 ;;
   help|-h|--help) usage; exit 0 ;;
   version|--version) echo "op-agent-sign $VERSION"; exit 0 ;;
   flush) do_flush; exit 0 ;;
   selftest) do_selftest ;;
-  bootstrap|setup|doctor) say "$1: not implemented yet (B2)"; exit 64 ;;
+  bootstrap) shift; do_bootstrap "$@" ;;
+  setup) shift; do_setup "$@" ;;
+  doctor) shift; do_doctor "$@" ;;
   -*) ;;
   *) say "unknown verb: $1"; usage; exit 64 ;;
 esac
@@ -233,6 +558,4 @@ for a in "$@"; do
   prev=$a
 done
 if [ "$is_sign" = 0 ]; then dbg "verify:passthrough"; exec "$SSHK" "$@"; fi
-ENV_TOK=${OP_SERVICE_ACCOUNT_TOKEN:-}
-unset OP_SERVICE_ACCOUNT_TOKEN
 sign_main "$@"

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Fake `hermes` for the op-agent-sign tests: only answers `secrets onepassword status` (exit FAKE_HERMES_RC, default 0).
+: "${FAKE_OP_DIR:?FAKE_OP_DIR not set}"
+printf '%s\n' "$*" >>"$FAKE_OP_DIR/hermes.calls"
+[ "$*" = "secrets onepassword status" ] || exit 2
+exit "${FAKE_HERMES_RC:-0}"

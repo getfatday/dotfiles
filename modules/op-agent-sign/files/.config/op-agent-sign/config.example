@@ -1,0 +1,33 @@
+# op-agent-sign config. Copy to ~/.config/op-agent-sign/config (directory 0700, file 0600; the wrapper
+# refuses a file that is group/other accessible, exit 77). Plain KEY="VALUE" lines, sourced by sh.
+# `op-agent-sign bootstrap` writes KEY_REF (and TOKEN_FILE when it is not the default) for you.
+# An OP_AGENT_SIGN_* variable in the environment overrides the file. No values live in this example.
+
+# Required for the service-account path: the signing key by vault ID and item ID (IDs, not names:
+# one request per read). Placeholders only here.
+# OP_AGENT_SIGN_KEY_REF="op://<vaultID>/<itemID>/private_key?ssh-format=openssh"
+
+# File holding OP_SERVICE_ACCOUNT_TOKEN=... (optionally prefixed with `export`, quoted or not).
+# Default: first existing of ~/.hermes/.op.env, ~/.hermes/.env, ~/.config/op-agent-sign/token.env
+# OP_AGENT_SIGN_TOKEN_FILE="<path to a 0600 file>"
+
+# Seconds the fetched key stays in the private in-memory agent (ssh-add -t / ssh-agent -t).
+# 0 = no cache (a throwaway agent per signature). Default 3600.
+# OP_AGENT_SIGN_TTL="3600"
+
+# Seconds allowed for the whole sign path. Default 20.
+# OP_AGENT_SIGN_DEADLINE="20"
+
+# Directory (0700) for agent.sock, agent.pid and lock/. Default $HOME/.cache/op-agent-sign.
+# OP_AGENT_SIGN_RUNTIME_DIR="<directory>"
+
+# Desktop-app signer used when no token is obtainable or the service account fails.
+# Default: the 1Password app's op-ssh-sign if present, else none. "none" disables the fallback.
+# OP_AGENT_SIGN_FALLBACK="none"
+
+# The op binary. Default: `op` from PATH.
+# OP_AGENT_SIGN_OP="<path to op>"
+
+# If set to a file path, non-secret trace lines (step names, exit codes, fingerprints) are appended.
+# Never values.
+# OP_AGENT_SIGN_DEBUG="<path>"

@@ -81,6 +81,7 @@ base_modules:
   - ngrok
   - node
   - obsidian
+  - op-agent-sign
   - productivity
   - rust
   - security

@@ -20,7 +20,7 @@ SLACK=${OP_AGENT_SIGN_TEST_SLACK:-8}
 [ -x "$BIN" ] || { echo "wrapper not found or not executable: $BIN" >&2; exit 2; }
 
 # Scrub inherited state that could leak into (or out of) the tests.
-for _v in $(env | awk -F= '$1 ~ /^(OP|GIT|SSH|FAKE)_/ {print $1}'); do unset "$_v" 2>/dev/null; done
+for _v in $(env | awk -F= '$1 ~ /^(OP|GIT|SSH|FAKE|HERMES)_/ {print $1}'); do unset "$_v" 2>/dev/null; done
 
 # --- private base dir; socket paths must stay under ~104 bytes ---
 BASE=""
@@ -146,12 +146,14 @@ echo "op-agent-sign selftest: wrapper=$BIN"
 echo "  base=$BASE  fake op=$(command -v op)  $(ssh -V 2>&1 | head -1)  sh=$(readlink /bin/sh 2>/dev/null || echo /bin/sh)"
 # shellcheck source=/dev/null
 . "$HERE/cases/ts.sh"
-for _c in ${CASES:-ts01 ts02 ts03 ts04 ts05 ts06 ts07 ts08 ts10 ts11 ts12 ts13 ts14 ts15 ts09 ts16}; do "$_c"; done
+# shellcheck source=/dev/null
+. "$HERE/cases/td.sh"
+for _c in ${CASES:-ts01 ts02 ts03 ts04 ts05 ts06 ts07 ts08 ts10 ts11 ts12 ts13 ts14 ts15 $TD_CASES ts09 ts16}; do "$_c"; done
 
 echo
 echo "PASSED:${PASSED:- none}"
 echo "FAILED:${FAILED:- none}"
-_want=16; [ -z "$CASES" ] || _want=$(echo $CASES | wc -w | tr -d ' ')
+_want=$((16 + $(echo $TD_CASES | wc -w))); [ -z "$CASES" ] || _want=$(echo $CASES | wc -w | tr -d ' ')
 if [ -z "$FAILED" ] && [ "$(echo $PASSED | wc -w | tr -d ' ')" = "$_want" ]; then echo "RESULT: all $_want passed"; exit 0; fi
 echo "RESULT: failures (or fewer than $_want cases ran)"
 exit 1
