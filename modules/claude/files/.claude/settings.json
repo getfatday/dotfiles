@@ -2,10 +2,12 @@
   "skipDangerousModePermissionPrompt": true,
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "GIT_CONFIG_COUNT": "2",
+    "GIT_CONFIG_COUNT": "3",
     "GIT_CONFIG_KEY_0": "gpg.ssh.program",
     "GIT_CONFIG_VALUE_0": "op-agent-sign",
     "GIT_CONFIG_KEY_1": "gpg.ssh.allowedSignersFile",
-    "GIT_CONFIG_VALUE_1": "~/.config/op-agent-sign/allowed_signers"
+    "GIT_CONFIG_VALUE_1": "~/.config/op-agent-sign/allowed_signers",
+    "GIT_CONFIG_KEY_2": "user.signingkey",
+    "GIT_CONFIG_VALUE_2": "key::REPLACE_WITH_AGENT_PUBLIC_KEY"
   }
 }

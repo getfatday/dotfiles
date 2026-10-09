@@ -272,9 +272,9 @@ tb01() {
   FAKE_OP_TOKEN=boot-token-six tty_run "$BIN" bootstrap --token-ref "$_REF" --yes
   expect "hermes: bootstrap exit 0" [ "$brc" = 0 ]
   { cat "$OUT/hermes.orig"
-    printf 'GIT_CONFIG_COUNT=2\nGIT_CONFIG_KEY_0=gpg.ssh.program\nGIT_CONFIG_VALUE_0=%s/.local/bin/op-agent-sign\nGIT_CONFIG_KEY_1=gpg.ssh.allowedSignersFile\nGIT_CONFIG_VALUE_1=%s/.config/op-agent-sign/allowed_signers\n' "$HOME" "$HOME"
+    printf 'GIT_CONFIG_COUNT=3\nGIT_CONFIG_KEY_0=gpg.ssh.program\nGIT_CONFIG_VALUE_0=%s/.local/bin/op-agent-sign\nGIT_CONFIG_KEY_1=gpg.ssh.allowedSignersFile\nGIT_CONFIG_VALUE_1=%s/.config/op-agent-sign/allowed_signers\nGIT_CONFIG_KEY_2=user.signingkey\nGIT_CONFIG_VALUE_2=key::%s\n' "$HOME" "$HOME" "$PUBLINE"
   } >"$OUT/hermes.want"
-  expect "hermes: .env = original + five absolute GIT_CONFIG_* lines" cmp "$HOME/.hermes/.env" "$OUT/hermes.want"
+  expect "hermes: .env = original + seven absolute GIT_CONFIG_* lines (COUNT=3, agent key)" cmp "$HOME/.hermes/.env" "$OUT/hermes.want"
   FAKE_OP_TOKEN=boot-token-seven tty_run "$BIN" bootstrap --token-ref "$_REF" --yes
   expect "hermes: rerun is idempotent for the GIT_CONFIG_* lines" cmp "$HOME/.hermes/.env" "$OUT/hermes.want"
   printf 'GIT_CONFIG_COUNT=1\nGIT_CONFIG_KEY_0=core.foo\nGIT_CONFIG_VALUE_0=1\n' >>"$HOME/.hermes/.env"

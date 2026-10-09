@@ -6,6 +6,7 @@
 #   FAKE_OP_DELAY      seconds to sleep before answering (concurrency tests)
 #   FAKE_OP_SLOW_SECS  how long `slow` mode sleeps (default 60)
 #   FAKE_OP_TOKEN      value served by `op read -n <ref>` (bootstrap tests)
+#   FAKE_OP_PUB / FAKE_OP_PUB_MODE   file served for `op read op://.../public_key` / ok|crlf|multi|bad|rsa|empty
 # Verbs: read <ref> | read -n <ref> | --version | whoami | item get <title> ... | service-account ratelimit
 : "${FAKE_OP_DIR:?FAKE_OP_DIR not set}"
 printf 'call\n' >>"$FAKE_OP_DIR/op.calls"
@@ -41,6 +42,21 @@ if [ "${2:-}" = -n ]; then
   printf '%s' "${FAKE_OP_TOKEN:?FAKE_OP_TOKEN not set}"
   exit 0
 fi
+# Desktop-session read of the item's public key: FAKE_OP_PUB_MODE ok | crlf | multi | bad | rsa | empty
+case ${2:-} in
+  */public_key)
+    printf '%s\n' "$2" >>"$FAKE_OP_DIR/op.pubreads"
+    case ${FAKE_OP_PUB_MODE:-ok} in
+      ok) cat "${FAKE_OP_PUB:?FAKE_OP_PUB not set}" ;;
+      crlf) awk '{ printf "%s\r\n", $0 }' "$FAKE_OP_PUB" ;;
+      multi) cat "$FAKE_OP_PUB" "$FAKE_OP_PUB" ;;
+      bad) echo "ssh-ed25519 AAAAnotakey" ;;
+      rsa) echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7" ;;
+      empty) exit 0 ;;
+    esac
+    exit 0
+    ;;
+esac
 [ -z "${FAKE_OP_DELAY:-}" ] || sleep "$FAKE_OP_DELAY"
 case ${FAKE_OP_MODE:-ok} in
   ok) cat "$FAKE_OP_KEY" ;;

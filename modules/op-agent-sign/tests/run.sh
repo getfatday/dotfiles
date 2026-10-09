@@ -74,9 +74,9 @@ printf '%s namespaces="git" %s\n' "$PRINCIPAL" "$PUBLINE" >"$ALLOWED"
 KB2=$(sed -n 2p "$VAULT/key") KB3=$(sed -n 3p "$VAULT/key")
 [ -n "$KB2" ] && [ -n "$KB3" ] || { echo "unexpected key file layout" >&2; exit 2; }
 FAKE_TOKEN="fake-sa-token-$(date +%s)-$$-$(awk 'BEGIN { srand(); print int(rand() * 1000000000) }')"
-FAKE_OP_KEY=$VAULT/key FAKE_OP_ENC_KEY=$VAULT/enc FAKE_OP_OTHER_KEY=$VAULT/other
+FAKE_OP_KEY=$VAULT/key FAKE_OP_ENC_KEY=$VAULT/enc FAKE_OP_OTHER_KEY=$VAULT/other FAKE_OP_PUB=$VAULT/key.pub
 FAKE_FB=$HERE/bin/op-ssh-sign
-export FAKE_OP_KEY FAKE_OP_ENC_KEY FAKE_OP_OTHER_KEY FAKE_OP_MODE FAKE_OP_DELAY FAKE_OP_SLOW_SECS
+export FAKE_OP_KEY FAKE_OP_ENC_KEY FAKE_OP_OTHER_KEY FAKE_OP_MODE FAKE_OP_DELAY FAKE_OP_SLOW_SECS FAKE_OP_PUB FAKE_OP_PUB_MODE
 export OP_AGENT_SIGN_FALLBACK OP_AGENT_SIGN_TTL OP_AGENT_SIGN_DEADLINE OP_AGENT_SIGN_DEBUG OP_AGENT_SIGN_SSH_KEYGEN
 
 # --- helpers ---
@@ -92,9 +92,9 @@ reset() {
   pkill -f "$RT/agent" 2>/dev/null
   rm -rf "$RT"
   : >"$FAKE_OP_DIR/op.calls"
-  rm -f "$FAKE_OP_DIR/fallback.calls" "$FAKE_OP_DIR/op.env" "$FAKE_OP_DIR/kg.env"
+  rm -f "$FAKE_OP_DIR/fallback.calls" "$FAKE_OP_DIR/op.env" "$FAKE_OP_DIR/kg.env" "$FAKE_OP_DIR/op.pubreads"
   unset PUB FAKE_OP_DELAY FAKE_OP_SLOW_SECS OP_SERVICE_ACCOUNT_TOKEN OP_AGENT_SIGN_SSH_KEYGEN OP_AGENT_SIGN_CONFIG OP_AGENT_SIGN_TOKEN_FILE
-  FAKE_OP_MODE=ok OP_AGENT_SIGN_FALLBACK=none OP_AGENT_SIGN_TTL=3600 OP_AGENT_SIGN_DEADLINE=$TEST_DEADLINE
+  FAKE_OP_MODE=ok FAKE_OP_PUB_MODE=ok OP_AGENT_SIGN_FALLBACK=none OP_AGENT_SIGN_TTL=3600 OP_AGENT_SIGN_DEADLINE=$TEST_DEADLINE
   OP_AGENT_SIGN_DEBUG=$OUT/debug.log RUNNER="" UFLAG=-U
   mk_config
 }
@@ -148,12 +148,14 @@ echo "  base=$BASE  fake op=$(command -v op)  $(ssh -V 2>&1 | head -1)  sh=$(rea
 . "$HERE/cases/ts.sh"
 # shellcheck source=/dev/null
 . "$HERE/cases/td.sh"
-for _c in ${CASES:-ts01 ts02 ts03 ts04 ts05 ts06 ts07 ts08 ts10 ts11 ts12 ts13 ts14 ts15 $TD_CASES ts09 ts16}; do "$_c"; done
+# shellcheck source=/dev/null
+. "$HERE/cases/ta.sh"
+for _c in ${CASES:-ts01 ts02 ts03 ts04 ts05 ts06 ts07 ts08 ts10 ts11 ts12 ts13 ts14 ts15 $TD_CASES $TA_CASES ts09 ts16}; do "$_c"; done
 
 echo
 echo "PASSED:${PASSED:- none}"
 echo "FAILED:${FAILED:- none}"
-_want=$((16 + $(echo $TD_CASES | wc -w))); [ -z "$CASES" ] || _want=$(echo $CASES | wc -w | tr -d ' ')
+_want=$((16 + $(echo $TD_CASES $TA_CASES | wc -w))); [ -z "$CASES" ] || _want=$(echo $CASES | wc -w | tr -d ' ')
 if [ -z "$FAILED" ] && [ "$(echo $PASSED | wc -w | tr -d ' ')" = "$_want" ]; then echo "RESULT: all $_want passed"; exit 0; fi
 echo "RESULT: failures (or fewer than $_want cases ran)"
 exit 1

@@ -10,9 +10,10 @@
 # Config (env overrides ~/.config/op-agent-sign/config, mode 0600): OP_AGENT_SIGN_KEY_REF,
 #   _TOKEN_FILE, _TTL (3600), _DEADLINE (20), _RUNTIME_DIR, _FALLBACK, _OP, _DEBUG, _CONFIG.
 # Test hooks: OP_AGENT_SIGN_SSH_KEYGEN (signer binary), OP_AGENT_SIGN_TESTS (selftest dir).
+# Agents sign with their OWN key (1Password vault Agent), injected as user.signingkey=key::<pub> via GIT_CONFIG_*.
 # Exit codes: 0 ok, 64 usage, 69 unavailable, 70 internal, 72 key mismatch, 75 temporary,
 #   77 permissions. Fallback order: cached agent, service account, FALLBACK app signer, fail closed.
-VERSION=0.2.0-b2
+VERSION=0.3.0-b5
 KEYS="KEY_REF TOKEN_FILE TTL DEADLINE RUNTIME_DIR FALLBACK OP DEBUG"
 WD="" CH="" TAGENT="" held=0 ERR="" RC="" SOFT="" INFO=0 TAB=$(printf '\t')
 
@@ -28,7 +29,8 @@ usage: op-agent-sign flush | selftest | version | help
        op-agent-sign -Y sign -n git -f <pubkey> [-U] <buffer>    (called by git as gpg.ssh.program)
        op-agent-sign setup [--check]
        op-agent-sign bootstrap [--token-ref REF] [--key-item TITLE] [--vault NAME] [--token-file PATH]
-                               [--yes] [--no-hermes-git-env]      (interactive: needs a terminal)
+                               [--agent-pub PUBKEY|key::PUBKEY] [--yes] [--no-hermes-git-env]
+                               (interactive: needs a terminal)
        op-agent-sign doctor [--offline] [--json] [--commit-test]
 USAGE
 }
@@ -276,6 +278,21 @@ exp_fp() {
   else EFP=$("$SSHK" -lf "$_f" 2>/dev/null | awk 'NR==1{print $2}'); fi
   [ -n "$EFP" ]
 }
+# norm_pub TEXT: APUB = "ssh-ed25519 <base64>" iff TEXT is exactly one such line (CRs, key:: prefix, comment tolerated)
+norm_pub() {
+  APUB="" _t=$(printf '%s' "$1" | tr -d '\r')
+  [ "$(printf '%s\n' "$_t" | wc -l | tr -d ' ')" = 1 ] || return 1
+  printf '%s\n' "${_t#key::}" | grep -Eq '^ssh-ed25519 AAAA[A-Za-z0-9+/]+=*( [^[:cntrl:]]*)?$' || return 1
+  APUB=$(printf '%s\n' "${_t#key::}" | awk '{ print $1 " " $2 }')
+  exp_fp "key::$APUB" || { APUB=""; return 1; }
+}
+# placeholder_check [EFFECTIVE_SIGNINGKEY]: fails while the Claude settings (or the effective key) hold the placeholder
+placeholder_check() {
+  _cj=$HOME/.claude/settings.json
+  if grep -qs REPLACE_WITH_AGENT_PUBLIC_KEY "$_cj" || case ${1:-} in *REPLACE_WITH_AGENT_PUBLIC_KEY*) true ;; *) false ;; esac; then
+    emit claude_env false "$(tilde "$_cj") or the effective user.signingkey still has key::REPLACE_WITH_AGENT_PUBLIC_KEY" "put the agent public key into GIT_CONFIG_VALUE_2 (modules/claude/files/.claude/settings.json), then dotm sync"
+  else emit claude_env true "no agent-key placeholder left in the Claude settings"; fi
+}
 # sa_probe: fetch $KEY_REF with the service account ($tok) into a throwaway agent; true iff it holds $EFP.
 sa_probe() {
   _ps=$RT/chk.$$.sock
@@ -342,6 +359,7 @@ do_setup() {
   _cs=$HOME/.claude/skills/op-agent-sign/SKILL.md
   if [ -f "$_cs" ]; then emit_i claude_skill true "$(tilde "$_cs") present"
   else emit_i claude_skill false "$(tilde "$_cs") not found" "run dotm sync once the module ships the skill"; fi
+  placeholder_check
   stop "op-agent-sign bootstrap --token-ref <ref> --key-item <title>, then op-agent-sign doctor" $((BAD > 0))
 }
 
@@ -408,12 +426,21 @@ do_doctor() {
     esac
     _w=$( ( OP_SERVICE_ACCOUNT_TOKEN=$tok; export OP_SERVICE_ACCOUNT_TOKEN; bounded 15 "$OPBIN" service-account ratelimit 2>/dev/null ) | tr -s ' \n\t' ' ')
     emit_i ratelimit true "${_w:-not available}"
-    if ! exp_fp "$_sk"; then emit key_reachable false "cannot compare: user.signingkey is unset or unreadable (set it, or inject GIT_CONFIG_* env)"
+    if ! exp_fp "$_sk"; then emit key_reachable false "cannot compare: the effective user.signingkey is unset or unreadable (agents get it as GIT_CONFIG_KEY_2/VALUE_2)"
     elif [ -d "$RT" ] && sa_probe; then emit key_reachable true "match: true"
-    else emit key_reachable false "match: false (key not readable with the service account, or differs from user.signingkey)" "check the item and vault scope, then op-agent-sign bootstrap"; fi
+    else emit key_reachable false "match: false (key not readable with the service account, or differs from the effective user.signingkey)" "check the item and vault scope, then op-agent-sign bootstrap"; fi
   fi
-  # 8 informational
-  if [ "$FB" != none ]; then emit_i fallback true "desktop-app signer present"; else emit_i fallback true "none (desktop-app signer disabled or absent)"; fi
+  placeholder_check "$_sk"
+  # 8 informational: effective (agent) vs global (human) signing key; op-ssh-sign only holds keys of the Private vault
+  _ef="" _gf="" _gk=$(git config --global user.signingkey 2>/dev/null)
+  ! exp_fp "$_sk" || _ef=$EFP
+  ! exp_fp "$_gk" || _gf=$EFP
+  emit_i signing_key true "effective (agent): ${_ef:-unknown}; global (human): ${_gf:-unset}"
+  if [ -n "$_ef" ] && [ "$_ef" != "$_gf" ]; then _dk=true; else _dk=false; fi
+  emit_i agent_key_distinct "$_dk" "agent_key_distinct: $_dk (agent key differs from the global key)"
+  if [ "$FB" = none ]; then emit_i fallback true "none (desktop-app signer disabled or absent)"
+  elif [ "$_dk" = true ]; then emit_i fallback true "unavailable for agent key (op-ssh-sign only signs with keys in the Private vault; signing fails closed without the service account)"
+  else emit_i fallback true "desktop-app signer present"; fi
   if [ -n "$CALLER_SOCK" ]; then emit_i caller_ssh_auth_sock true "set in the caller (ignored: the wrapper uses its own agent)"; else emit_i caller_ssh_auth_sock true "unset"; fi
   if command -v hermes >/dev/null 2>&1; then
     if [ "$OFF" = 1 ]; then emit_i hermes_onepassword true "skipped (--offline)"
@@ -444,14 +471,14 @@ do_doctor() {
 }
 
 do_bootstrap() {
-  K=step JSON=1 BAD=0 SOFT=1 TREF="" KITEM="" TFILE="" YES=0 HGE=1 VAULT=Agent
+  K=step JSON=1 BAD=0 SOFT=1 TREF="" KITEM="" TFILE="" YES=0 HGE=1 VAULT=Agent APIN=""
   while [ $# -gt 0 ]; do
     case $1 in
       --yes) YES=1 ;;
       --no-hermes-git-env) HGE=0 ;;
-      --token-ref|--key-item|--vault|--token-file)
+      --token-ref|--key-item|--vault|--token-file|--agent-pub)
         [ $# -ge 2 ] || { say "bootstrap: $1 needs a value (exit 64)"; exit 64; }
-        case $1 in --token-ref) TREF=$2 ;; --key-item) KITEM=$2 ;; --vault) VAULT=$2 ;; *) TFILE=$2 ;; esac
+        case $1 in --token-ref) TREF=$2 ;; --key-item) KITEM=$2 ;; --vault) VAULT=$2 ;; --agent-pub) APIN=$2 ;; *) TFILE=$2 ;; esac
         shift ;;
       *) say "bootstrap: unknown option $1 (exit 64)"; exit 64 ;;
     esac
@@ -463,7 +490,7 @@ do_bootstrap() {
   if [ -z "$TFILE" ]; then
     if [ -d "$HOME/.hermes" ]; then TFILE=$HOME/.hermes/.op.env; else TFILE=$HOME/.config/op-agent-sign/token.env; fi
   fi
-  case $TFILE$TREF$KITEM$VAULT in *[\"\$\`\\]*) emit preflight false "values may not contain quotes, dollar signs, backticks or backslashes"; stop "" 64 ;; esac
+  case $TFILE$TREF$KITEM$VAULT$APIN in *[\"\$\`\\]*) emit preflight false "values may not contain quotes, dollar signs, backticks or backslashes"; stop "" 64 ;; esac
   if [ -n "$ENV_TOK" ]; then emit preflight false "OP_SERVICE_ACCOUNT_TOKEN is set in this environment; unset it so op uses the desktop app"; stop "" 64; fi
   if [ ! -t 0 ]; then emit preflight false "bootstrap is interactive and needs a terminal"; stop "" 64; fi
   if { [ -z "$TREF" ] && ! find_token; } || { [ -z "$KITEM" ] && [ -z "$KEY_REF" ]; }; then
@@ -509,22 +536,34 @@ do_bootstrap() {
   SOFT=1 load_config
   if ! find_token; then emit validate false "no usable token file after bootstrap"; stop "" 69; fi
   ensure_dir "$RT"
-  if ! exp_fp "$(git config user.signingkey 2>/dev/null)"; then
-    emit validate false "user.signingkey is unset or unreadable; rerun with GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.signingkey GIT_CONFIG_VALUE_0=key::<agent public key> in the environment"
-  elif sa_probe; then emit validate true "match: true"
-  else emit validate false "match: false (the service account could not read the key, or it differs from user.signingkey)" "check the item, vault scope and --vault"; fi
+  # The AGENT public key: the --agent-pub override, else the key item's public_key field read through the desktop app.
+  if [ -n "$APIN" ]; then norm_pub "$APIN" || APUB=""
+  else
+    _pt=$(bounded 120 "$OPBIN" read "${KEY_REF%/private_key*}/public_key" 2>/dev/null) && norm_pub "$_pt" || APUB=""
+  fi
+  if [ -z "$APUB" ]; then emit agent_pub false "no single ssh-ed25519 public key from --agent-pub or the item's public_key field" "check --key-item (an Ed25519 SSH key item) or pass --agent-pub"; stop "" 69; fi
+  emit agent_pub true "agent public key fingerprint $EFP"
+  if sa_probe; then emit validate true "match: true"
+  else emit validate false "match: false (the service account could not read the key, or it differs from the agent public key)" "check the item, vault scope and --vault"; fi
   _ge=$HOME/.hermes/.env
   if [ "$HGE" = 0 ] || [ ! -d "$HOME/.hermes" ]; then emit_i hermes_git_env true "skipped"
   else
     _n=$(sed -n 's/^GIT_CONFIG_COUNT=//p' "$_ge" 2>/dev/null | tail -n 1)
     _k0=$(sed -n 's/^GIT_CONFIG_KEY_0=//p' "$_ge" 2>/dev/null | tail -n 1) _k1=$(sed -n 's/^GIT_CONFIG_KEY_1=//p' "$_ge" 2>/dev/null | tail -n 1)
-    if [ -n "$_n$_k0$_k1" ] && { [ "$_n" != 2 ] || [ "$_k0" != gpg.ssh.program ] || [ "$_k1" != gpg.ssh.allowedSignersFile ]; }; then
+    _k2=$(sed -n 's/^GIT_CONFIG_KEY_2=//p' "$_ge" 2>/dev/null | tail -n 1) _own=0
+    # Ours: nothing yet, our previous COUNT=2 shape (upgraded in place), or our COUNT=3 shape. Anything else is foreign.
+    [ -n "$_n$_k0$_k1$_k2" ] || _own=1
+    [ "$_n$_k0$_k1$_k2" != "2gpg.ssh.programgpg.ssh.allowedSignersFile" ] || _own=1
+    [ "$_n$_k0$_k1$_k2" != "3gpg.ssh.programgpg.ssh.allowedSignersFileuser.signingkey" ] || _own=1
+    if [ "$_own" = 0 ]; then
       emit hermes_git_env false "$(tilde "$_ge") already has other GIT_CONFIG_* lines; left untouched" "merge by hand or use git -c gpg.ssh.program=op-agent-sign"
-    elif upsert_env "$_ge" "GIT_CONFIG_COUNT=2
+    elif upsert_env "$_ge" "GIT_CONFIG_COUNT=3
 GIT_CONFIG_KEY_0=gpg.ssh.program
 GIT_CONFIG_VALUE_0=$HOME/.local/bin/op-agent-sign
 GIT_CONFIG_KEY_1=gpg.ssh.allowedSignersFile
-GIT_CONFIG_VALUE_1=$HOME/.config/op-agent-sign/allowed_signers"; then emit hermes_git_env true "GIT_CONFIG_* lines written to $(tilde "$_ge") (absolute paths); run: hermes gateway restart"
+GIT_CONFIG_VALUE_1=$HOME/.config/op-agent-sign/allowed_signers
+GIT_CONFIG_KEY_2=user.signingkey
+GIT_CONFIG_VALUE_2=key::$APUB"; then emit hermes_git_env true "GIT_CONFIG_* lines (COUNT=3, with the agent signing key) written to $(tilde "$_ge") (absolute paths); run: hermes gateway restart"
     else emit hermes_git_env false "could not update $(tilde "$_ge")"; fi
   fi
   (do_doctor --json); _dr=$?

@@ -32,12 +32,15 @@ op-agent-sign doctor --offline
 ```
 
 No `op` call, no quota use. Read the `git_routing` line: `routed: true` means git already uses the wrapper
-(the `env` block in `~/.claude/settings.json` sets `GIT_CONFIG_COUNT=2` with `gpg.ssh.program=op-agent-sign`
-and `gpg.ssh.allowedSignersFile=~/.config/op-agent-sign/allowed_signers`); `routed: false` means it does
+(the `env` block in `~/.claude/settings.json` sets `GIT_CONFIG_COUNT=3` with `gpg.ssh.program=op-agent-sign`,
+`gpg.ssh.allowedSignersFile=~/.config/op-agent-sign/allowed_signers` and `user.signingkey=key::<agent public key>`);
+`routed: false` means it does
 not (older session, `~/.local/bin` not on `PATH`, or settings not applied: tell the user to restart Claude
 Code). The exit code is 0 only if every non-informational check passed; for another failing check, quote its
 `fix` text to the user and use section 5. `runtime_dir` failing is fixed by `op-agent-sign setup` (creates 0700
-directories only; safe to repeat). Do not repair token or config files yourself.
+directories only; safe to repeat). If `claude_env` fails, the settings still hold the placeholder
+`key::REPLACE_WITH_AGENT_PUBLIC_KEY`: tell the user to put the agent public key into `GIT_CONFIG_VALUE_2`
+(you cannot know it). Do not repair token or config files yourself.
 
 ## 3. Commit
 
@@ -47,11 +50,13 @@ Routed:
 git commit -S -m "message"
 ```
 
-Not routed (one command only; the absolute path works even when `~/.local/bin` is not on `PATH`):
+Not routed (one command only; `<agent public key>` is the value of `GIT_CONFIG_VALUE_2` in the Claude settings,
+`key::ssh-ed25519 AAAA...`; the absolute path works even when `~/.local/bin` is not on `PATH`):
 
 ```
 git -c gpg.ssh.program="$HOME/.local/bin/op-agent-sign" \
     -c gpg.ssh.allowedSignersFile="$HOME/.config/op-agent-sign/allowed_signers" \
+    -c user.signingkey="key::<agent public key>" \
     commit -S -m "message"
 ```
 
@@ -81,12 +86,14 @@ message). The text never contains the token or key.
 | 64 | Usage: bad option | You called the wrapper wrongly. Fix the command. |
 | 69 | No token, or token rejected | Stop. Tell the user: "the signing service account is not set up on this machine or its token was rejected; run `op-agent-sign bootstrap` in a terminal (see the module README), then `op-agent-sign doctor`." You cannot do this yourself. |
 | 70 | Internal error (agent did not start, socket path too long, unexpected `op` failure) | Run `op-agent-sign flush`, retry once. Still failing: show the user the failing `doctor --offline` line. |
-| 72 | Key mismatch: no key matching `user.signingkey` (wrong item, passphrase-protected key, empty read) | Configuration problem; do not retry. Tell the user which `doctor` check failed. |
+| 72 | Key mismatch: no key matching the signing public key (`user.signingkey` from the env: wrong item, passphrase-protected key, empty read) | Configuration problem; do not retry. Tell the user which `doctor` check failed. |
 | 75 | Temporary: deadline, rate limit (429), network | Wait the delay printed (about 60 s for a 429, otherwise a minute), retry once. Still failing: stop and tell the user it is temporary. |
 | 77 | Permissions: config dir/file or token file is group/other-accessible | Stop. Tell the user the path `doctor` flagged and that it needs mode 0600 (directories 0700). Do not `chmod` token files yourself. |
 
 When the service-account path fails with 69 or 75 the wrapper may fall back to the 1Password app's signer
-and print `warning: service-account path unavailable`; mention that warning in your summary.
+and print `warning: service-account path unavailable`. That signer only holds keys of the user's Private
+vault, so it cannot sign with the agent key (`doctor` reports `fallback: unavailable for agent key`): expect
+the commit to fail closed. Mention any such warning in your summary.
 
 ## 6. Rules
 
@@ -106,7 +113,9 @@ and print `warning: service-account path unavailable`; mention that warning in y
 
 ## 7. Rotation
 
-Token and key rotation, revocation and the full bootstrap command are in the module README
-(`~/src/dotfiles/modules/op-agent-sign/README.md`, "Rotation and revocation"). The user rotates the token
+Token and agent-key rotation, revocation and the full bootstrap command are in the module README
+(`~/src/dotfiles/modules/op-agent-sign/README.md`, "Agent signing key" and "Rotation and revocation"). Key
+rotation is: new item in the vault Agent, new signing-only key on GitHub, append (never delete) a line in
+`allowed_signers`, re-bootstrap, keep the old lines. The user rotates the token
 with `op-agent-sign bootstrap` (`hermes secrets onepassword token` also works but writes to
 `~/.hermes/.env`). Never run `bootstrap` yourself: it needs a terminal and the 1Password app.
