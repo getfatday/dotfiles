@@ -58,3 +58,6 @@ __pycache__/
 *.pyc
 .venv/
 .claude/worktrees/
+
+# Machine-local Discord ids for the hermes-discord module (private server ids; never committed)
+discord-ids.yaml

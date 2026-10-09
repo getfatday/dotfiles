@@ -1,0 +1,33 @@
+---
+# Hermes-discord module
+# The Discord conversation layer for a Hermes gateway: renders the default profile's
+# gateway.profile_routes, the discord:/display:/kanban: settings and the content guard plugin
+# switch from a machine-local ids file. Config only. It never creates a bot, never touches a token
+# and never runs `hermes gateway setup`; those are yours.
+#
+#   hermes-discord-setup             apply (idempotent; writes only keys that differ, via
+#                                    `hermes config set`, so comments and other keys survive)
+#   hermes-discord-setup --dry-run   show which keys would change
+#   hermes-discord-setup --check     read-only health check, exit 1 on drift
+#
+# A no-op until BOTH exist: ~/.config/hermes/discord-ids.yaml (machine-local, gitignored; copy
+# ~/.local/share/hermes-discord/discord-ids.example.yaml) and a bot token in the default profile. Stowing this
+# module changes nothing on its own; the script is run by hand.
+#
+# `detail:` in the ids file is the one per-machine setting: content-free (work Mac: ids, status
+# words and counts only; tool progress off; no slash-command menu; guard on; only /kanban
+# comment|unblock|stats, /help, /whoami get through) or full (the personal machine: guard
+# disabled). The guard plugin and the ping script come from hermes-agents (scripts/sync.sh).
+#
+# Relies on: hermes (hermes-host), /usr/bin/python3 with PyYAML.
+
+# Selected only on a Mac that declares `hermes-discord` under `capabilities:` in its
+# ~/.config/dotm/config.yml. No role provides it.
+requires: [macos, hermes-discord]
+
+stow_dirs:
+  - hermes-discord
+
+# Note: after apply, once the ids file and the token exist:
+#   hermes-discord-setup --dry-run && hermes-discord-setup && hermes gateway restart
+#   hermes-discord-setup --check
