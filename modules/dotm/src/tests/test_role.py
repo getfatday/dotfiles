@@ -146,7 +146,7 @@ def test_repo_profiles_define_the_three_roles_and_mixed_is_the_union():
 # Base modules whose requirements go beyond the platform, and the machine-declared capability
 # each one needs. Requirements are added one PR at a time; every addition extends this map.
 OPT_IN = {"tart": ["virtualization-host"], "session-host": ["session-host"], "hermes": ["hermes-host"],
-          "litellm": ["llm-proxy-host"]}
+          "litellm": ["llm-proxy-host"], "hermes-discord": ["hermes-discord"]}
 
 
 def test_repo_base_modules_require_the_macos_platform_or_a_declared_capability():
@@ -309,3 +309,30 @@ def test_repo_litellm_is_selected_only_where_llm_proxy_host_is_declared():
                                   MODULES_DIR)
         assert with_cap == sorted(before + ["litellm"]), \
             f"role {role}: declaring the capability should add exactly litellm"
+
+
+def test_repo_hermes_discord_is_selected_only_where_hermes_discord_is_declared():
+    """The Discord gateway config for the default Hermes profile: `hermes-discord` joins
+    base_modules requiring the capability of the same name, which no role provides. A Mac that does
+    not declare it resolves exactly the set it resolved before; a Mac that declares it under
+    `capabilities:` gains hermes-discord and nothing else (hermes itself stays a separate opt-in)."""
+    data = yaml.safe_load(PROFILES_YML.read_text())
+    roles = data["role_capabilities"]
+    base = data["base_modules"]
+    assert "hermes-discord" in base
+    config = yaml.safe_load((MODULES_DIR / "hermes-discord" / "config.yml").read_text())
+    assert module_requires(config, "hermes-discord") == ["macos", "hermes-discord"]
+    assert "hermes-discord" not in {c for caps in roles.values() for c in caps}
+    assert "hermes-discord" in data["declared_capabilities"]
+    before = sorted(set(base) - set(OPT_IN))
+    for role in [None, *roles]:
+        without = select_modules(base, resolve_capabilities(role, DEFAULT_PLATFORM, roles), MODULES_DIR)
+        assert "hermes-discord" not in without
+        assert without == before, f"role {role}: a machine without the capability changed"
+        with_cap = select_modules(base, resolve_capabilities(role, [*DEFAULT_PLATFORM, "hermes-discord"], roles),
+                                  MODULES_DIR)
+        assert with_cap == sorted(before + ["hermes-discord"]), \
+            f"role {role}: declaring the capability should add exactly hermes-discord"
+    # Off macOS the capability alone selects nothing.
+    pi = resolve_capabilities("personal", ["linux-arm", "apt", "headless", "hermes-discord"], roles)
+    assert "hermes-discord" not in select_modules(base, pi, MODULES_DIR)

@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""hermes-discord-setup: render the default profile's Discord gateway config from a machine-local ids file.
+
+    hermes-discord-setup              apply (idempotent; only differing keys are written)
+    hermes-discord-setup --dry-run    show which keys would change, write nothing
+    hermes-discord-setup --check      read-only health check; exit 1 on drift or a failed check
+
+A NO-OP until BOTH exist (exit 0, nothing written, says why):
+  1. ~/.config/hermes/discord-ids.yaml   machine-local, gitignored (see ~/.local/share/hermes-discord/discord-ids.example.yaml)
+  2. a Discord bot token in the default profile: DISCORD_BOT_TOKEN in its .env, or a
+     secrets.onepassword.env.DISCORD_BOT_TOKEN reference in its config.yaml. Presence is the only
+     thing ever tested; the value is never read into output.
+
+This script never creates a bot, never asks for or writes a token, and never runs
+`hermes gateway setup`. Writes go through `hermes config set` (Hermes' own writer), so comments and
+unrelated keys in config.yaml and .env survive.
+
+What it renders (default profile only; routes live there):
+  gateway.profile_routes   the ids file's routes (other platforms' and unrelated routes are kept)
+  discord.*                require_mention, free_response_channels, auto_thread, history_backfill,
+                           allow_bots, allow_mentions
+  plugins                  discord-content-guard enabled, plugins.entries.<it>.settings.detail
+  .env                     DISCORD_ALLOWED_USERS, DISCORD_HOME_CHANNEL(+_NAME)
+  detail: content-free adds display.tool_progress off, gateway.platforms.discord.extra.slash_commands
+                           false, kanban.auto_subscribe_on_create false, DISCORD_ALLOWED_CHANNELS
+It refuses to run when an allow-all flag is on.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover - environment dependent
+    yaml = None
+
+GUARD = "discord-content-guard"
+DETAILS = ("content-free", "full")
+SNOWFLAKE = re.compile(r"^(?!0+$)[0-9]{17,20}$")
+NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+TRUTHY = {"1", "true", "yes", "on"}
+ALLOW_ALL_ENV = ("DISCORD_ALLOW_ALL_USERS", "GATEWAY_ALLOW_ALL_USERS")
+_MISSING = object()
+
+
+class SetupError(Exception):
+    pass
+
+
+# ---------------------------------------------------------------- paths and reading
+
+def hermes_home():
+    return os.environ.get("HERMES_HOME") or os.path.expanduser("~/.hermes")
+
+
+def hermes_root(home):
+    marker = os.sep + "profiles" + os.sep
+    return home.split(marker)[0] if marker in home else home
+
+
+def ids_path():
+    return os.environ.get("HERMES_DISCORD_IDS") or os.path.expanduser("~/.config/hermes/discord-ids.yaml")
+
+
+def read_yaml(path):
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+def read_env_file(path):
+    """{KEY: value} from a dotenv file. Callers must not print the values."""
+    out = {}
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                out[k.strip()] = v.strip().strip("'\"")
+    except OSError:
+        pass
+    return out
+
+
+def nested_get(cfg, dotted, default=_MISSING):
+    cur = cfg
+    for part in dotted.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return default
+        cur = cur[part]
+    return cur
+
+
+def token_present(cfg, env):
+    if env.get("DISCORD_BOT_TOKEN"):
+        return True
+    ref = nested_get(cfg, "secrets.onepassword.env.DISCORD_BOT_TOKEN", None)
+    return bool(ref)
+
+
+# ---------------------------------------------------------------- the ids file
+
+def load_ids(path, installed_profiles):
+    """Validate the ids file. Returns the dict; raises SetupError listing every problem."""
+    data = read_yaml(path)
+    problems = []
+    if not isinstance(data, dict):
+        raise SetupError("%s: expected a mapping" % path)
+
+    detail = str(data.get("detail", "content-free")).strip().lower()
+    if detail not in DETAILS:
+        problems.append("detail must be one of %s" % ", ".join(DETAILS))
+    for key in ("guild_id", "user_id"):
+        if not SNOWFLAKE.match(str(data.get(key, ""))):
+            problems.append("%s must be a real numeric Discord id (17-20 digits, not the all-zero placeholder), quoted" % key)
+
+    routes = data.get("routes")
+    names = set()
+    if not isinstance(routes, list) or not routes:
+        problems.append("routes must be a non-empty list")
+        routes = []
+    for i, r in enumerate(routes):
+        if not isinstance(r, dict):
+            problems.append("routes[%d] must be a mapping" % i)
+            continue
+        name = str(r.get("name", ""))
+        if not NAME.match(name):
+            problems.append("routes[%d].name is missing or has unsafe characters" % i)
+        if name in names:
+            problems.append("routes[%d].name %r is repeated" % (i, name))
+        names.add(name)
+        if not SNOWFLAKE.match(str(r.get("chat_id", ""))):
+            problems.append("routes[%d].chat_id must be a real numeric channel id (not the all-zero placeholder), quoted" % i)
+        profile = str(r.get("profile", ""))
+        if profile != "default" and profile not in installed_profiles:
+            problems.append("routes[%d].profile %r is not installed (run hermes-agents scripts/sync.sh)" % (i, profile))
+    for key in ("control_channel", "home_channel"):
+        v = data.get(key)
+        if v is not None and v not in names:
+            problems.append("%s %r is not the name of a route" % (key, v))
+    if detail == "content-free" and not data.get("control_channel"):
+        problems.append("control_channel is required when detail is content-free (it becomes DISCORD_ALLOWED_CHANNELS)")
+    if problems:
+        raise SetupError("%s:\n  - %s" % (path, "\n  - ".join(problems)))
+    data["detail"] = detail
+    return data
+
+
+# ---------------------------------------------------------------- desired state
+
+def chat_id_of(ids, name):
+    for r in ids["routes"]:
+        if r["name"] == name:
+            return str(r["chat_id"])
+    return None
+
+
+def render_routes(ids):
+    return [{"name": r["name"], "platform": "discord", "guild_id": str(ids["guild_id"]),
+             "chat_id": str(r["chat_id"]), "profile": r["profile"]} for r in ids["routes"]]
+
+
+def desired_state(ids, cfg):
+    """-> (config_pairs, env_pairs): ordered [(dotted key, value)] to make true."""
+    content_free = ids["detail"] == "content-free"
+    managed = {r["name"] for r in ids["routes"]}
+    kept = [r for r in (nested_get(cfg, "gateway.profile_routes", []) or [])
+            if not (isinstance(r, dict) and r.get("platform") == "discord" and r.get("name") in managed)]
+    pairs = [("gateway.profile_routes", kept + render_routes(ids))]
+
+    control = chat_id_of(ids, ids.get("control_channel")) if ids.get("control_channel") else None
+    pairs += [
+        ("discord.require_mention", True),
+        ("discord.free_response_channels", [control] if control else []),
+        ("discord.auto_thread", False),
+        ("discord.history_backfill", False),
+        ("discord.allow_bots", "none"),
+        ("discord.allow_mentions", {"everyone": False, "roles": False}),
+    ]
+    enabled = list(nested_get(cfg, "plugins.enabled", []) or [])
+    if GUARD not in enabled:
+        enabled.append(GUARD)
+    pairs += [("plugins.enabled", enabled),
+              ("plugins.entries.%s.settings.detail" % GUARD, ids["detail"])]
+    if content_free:
+        pairs += [("display.tool_progress", "off"),
+                  ("gateway.platforms.discord.extra.slash_commands", False),
+                  ("kanban.auto_subscribe_on_create", False)]
+
+    env = [("DISCORD_ALLOWED_USERS", str(ids["user_id"]))]
+    if content_free:
+        env.append(("DISCORD_ALLOWED_CHANNELS", control))
+    home = ids.get("home_channel")
+    if home:
+        env += [("DISCORD_HOME_CHANNEL", chat_id_of(ids, home)), ("DISCORD_HOME_CHANNEL_NAME", "#" + home)]
+    return pairs, env
+
+
+def plan(ids, cfg, env_file):
+    pairs, env = desired_state(ids, cfg)
+    changes = []
+    for key, want in pairs:
+        if nested_get(cfg, key) != want:
+            changes.append(("config", key, want))
+    for key, want in env:
+        if env_file.get(key) != want:
+            changes.append(("env", key, want))
+    return changes
+
+
+def safety_problems(cfg, env_file):
+    out = []
+    for k in ALLOW_ALL_ENV:
+        if str(env_file.get(k, "")).strip().lower() in TRUTHY:
+            out.append("%s is on in .env; remove it (only your own numeric id may drive the bot)" % k)
+    if nested_get(cfg, "gateway.allow_all_users", False) is True:
+        out.append("gateway.allow_all_users is true; set it to false")
+    return out
+
+
+def check_problems(ids, cfg, env_file, root, home):
+    """Read-only checks beyond drift. Strings are fixed text; ids and tokens are never included."""
+    out = []
+    if not os.path.isdir(os.path.join(home, "plugins", GUARD)):
+        out.append("plugin %s is not installed (run hermes-agents scripts/sync.sh)" % GUARD)
+    if not token_present(cfg, env_file):
+        out.append("no bot token present (DISCORD_BOT_TOKEN in .env or a secrets.onepassword ref)")
+    return out + safety_problems(cfg, env_file)
+
+
+# ---------------------------------------------------------------- applying
+
+def hermes_set(hermes, key, value, env):
+    if isinstance(value, bool):
+        arg = "true" if value else "false"
+    elif isinstance(value, (list, dict)):
+        arg = json.dumps(value)  # JSON is valid flow-YAML; strings stay quoted, so ids stay strings
+    else:
+        arg = str(value)
+    p = subprocess.run([hermes, "config", "set", key, arg], capture_output=True, text=True, env=env)
+    if p.returncode != 0:
+        raise SetupError("hermes config set %s failed" % key)
+
+
+def describe(kind, key, value):
+    if isinstance(value, (list, dict)):
+        return "%s %s (%d entries)" % (kind, key, len(value))
+    return "%s %s" % (kind, key)
+
+
+def run(args, out=print):
+    if yaml is None:
+        out("PyYAML is missing for this python3; run with /usr/bin/python3 or: uv run --with pyyaml hermes-discord-setup")
+        return 1
+    home = hermes_home()
+    if os.sep + "profiles" + os.sep in home:
+        out("refusing: HERMES_HOME points at a profile; routes live on the default profile (unset HERMES_HOME)")
+        return 1
+    root = hermes_root(home)
+    cfg_path = os.path.join(home, "config.yaml")
+    env_path = os.path.join(home, ".env")
+
+    ids_file = ids_path()
+    if not os.path.exists(ids_file):
+        out("no ids file at %s: nothing to do" % ids_file)
+        return 0
+    cfg = (read_yaml(cfg_path) if os.path.exists(cfg_path) else {}) or {}
+    env_file = read_env_file(env_path)
+    if not token_present(cfg, env_file):
+        out("no Discord bot token in the default profile yet: nothing to do (the token is yours to add)")
+        return 0
+
+    profiles_dir = os.path.join(root, "profiles")
+    installed = set(os.listdir(profiles_dir)) if os.path.isdir(profiles_dir) else set()
+    try:
+        ids = load_ids(ids_file, installed)
+    except SetupError as e:
+        out(str(e))
+        return 1
+
+    unsafe = safety_problems(cfg, env_file)
+    if unsafe:
+        for p in unsafe:
+            out("refusing: " + p)
+        return 1
+
+    changes = plan(ids, cfg, env_file)
+    if args.check:
+        problems = check_problems(ids, cfg, env_file, root, home)
+        for kind, key, value in changes:
+            out("drift: " + describe(kind, key, value))
+        for p in problems:
+            out("fail: " + p)
+        out("ok" if not changes and not problems else "not ok")
+        return 0 if not changes and not problems else 1
+
+    if not os.path.isdir(os.path.join(home, "plugins", GUARD)):
+        out("refusing: plugin %s is not installed; run ~/src/hermes-agents/scripts/sync.sh first" % GUARD)
+        return 1
+    if not changes:
+        out("up to date")
+        return 0
+    env = dict(os.environ)
+    for kind, key, value in changes:
+        out(("would set " if args.dry_run else "set ") + describe(kind, key, value))
+        if not args.dry_run:
+            hermes_set(args.hermes, key, value, env)
+    if not args.dry_run:
+        out("done; restart the gateway to pick it up: hermes gateway restart")
+    return 0
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Render the default profile's Discord config from the machine-local ids file.")
+    ap.add_argument("--check", action="store_true", help="read-only; exit 1 on drift or a failed check")
+    ap.add_argument("--dry-run", action="store_true", help="show what would change, write nothing")
+    ap.add_argument("--hermes", default=os.environ.get("HERMES_BIN") or "hermes")
+    return run(ap.parse_args(argv))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,16 @@
+# Copy to discord-ids.yaml (same directory) and fill in. That file is machine-local and gitignored:
+# it holds ids only (not secrets), but they identify your private server, so they stay out of the repo.
+# Get an id: Discord > Settings > Advanced > Developer Mode on, then right-click > Copy ID.
+# Quote every id: they are too long for YAML to treat as numbers safely.
+#
+# Nothing is applied until this file AND a bot token exist; then run: hermes-discord-setup
+detail: full                  # full on both Macs (owner decision); content-free is an opt-in restriction
+guild_id: "000000000000000000"
+user_id: "000000000000000000" # your numeric user id. Only this id may drive the bot.
+control_channel: work-control # route name: the one channel the bot listens in (content-free machines)
+home_channel: work-pings      # route name: where cron output and `hermes send` land by default
+routes:                       # channel -> profile; the profile must be installed (or `default`)
+  - {name: work-control,    chat_id: "000000000000000000", profile: default}
+  - {name: work-pings,      chat_id: "000000000000000000", profile: default}
+  - {name: work-sessions,   chat_id: "000000000000000000", profile: sessions}
+  # Phase 2 (Mac-to-Mac #bridge) adds a route here and flips allow_bots; nothing to set yet.
