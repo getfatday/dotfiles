@@ -8,6 +8,6 @@
     "GIT_CONFIG_KEY_1": "gpg.ssh.allowedSignersFile",
     "GIT_CONFIG_VALUE_1": "~/.config/op-agent-sign/allowed_signers",
     "GIT_CONFIG_KEY_2": "user.signingkey",
-    "GIT_CONFIG_VALUE_2": "key::REPLACE_WITH_AGENT_PUBLIC_KEY"
+    "GIT_CONFIG_VALUE_2": "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP4CV/xH/bUrvQmpCcd56O0lVGx5nx2niAVyuS3U58we"
   }
 }

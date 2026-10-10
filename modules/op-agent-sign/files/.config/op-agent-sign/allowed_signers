@@ -1,4 +1,4 @@
 getfatday@gmail.com namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHQCDl9wUFLPF1cvH4+PAXir0HcGu/ZtZmIkq9o1zky2
 # Agent signing key (vault Agent). Replace <agent pub> with its public key (ssh-ed25519 AAAA...) and remove the leading "# ".
 # Append-only: never delete a line; old commits must keep verifying after a rotation.
-# getfatday@gmail.com namespaces="git" <agent pub>
+getfatday@gmail.com namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP4CV/xH/bUrvQmpCcd56O0lVGx5nx2niAVyuS3U58we
