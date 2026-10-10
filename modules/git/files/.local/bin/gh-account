@@ -1,0 +1,333 @@
+#!/usr/bin/env python3
+"""Pick the GitHub account for a repository owner.
+
+gh keeps several logins per host but only one of them is "active", and any
+process can flip it. This resolver picks the account from the repository owner
+instead, so the choice follows the repo rather than machine state.
+
+Map file: ~/.config/gh/accounts.json (override with GH_ACCOUNT_MAP)
+
+    {"hosts": {"github.com": {
+        "default": "work-login",
+        "owners": {"my-personal-org": "personal-login", "work-org": "work-login"},
+        "learned": {}}}}
+
+Commands
+    gh-account pick -- <gh args>         print "HOST USER", or "passthrough" when
+                                         the active account is already right
+    gh-account resolve HOST OWNER [REPO] print the account for an owner
+    gh-account credential get|store|erase   git credential helper protocol
+    gh-account set HOST OWNER USER       pin an owner to an account in the map
+    gh-account show                      print the map and the logins per host
+
+Tokens are minted on demand with `gh auth token` and never written anywhere.
+Unknown owners are learned: each login is asked whether it can see the repo
+and whether it can push; a single best answer is remembered under "learned".
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+REAL_GH = os.environ.get("GH_ACCOUNT_REAL_GH", "/opt/homebrew/bin/gh")
+MAP_PATH = os.environ.get("GH_ACCOUNT_MAP") or os.path.expanduser("~/.config/gh/accounts.json")
+HOSTS_PATH = os.path.expanduser("~/.config/gh/hosts.yml")
+DEBUG = bool(os.environ.get("GH_ACCOUNT_DEBUG"))
+
+# gh subcommands that never target a repository
+PASSTHROUGH = {
+    "auth", "config", "extension", "extensions", "help", "version",
+    "completion", "alias", "--version", "--help", "-h", "",
+}
+
+
+def log(msg):
+    if DEBUG:
+        sys.stderr.write("gh-account: %s\n" % msg)
+
+
+def strip_suffix(text, suffix):
+    return text[: -len(suffix)] if suffix and text.endswith(suffix) else text
+
+
+def clean_env():
+    env = dict(os.environ)
+    for key in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"):
+        env.pop(key, None)
+    return env
+
+
+def load_map():
+    try:
+        with open(MAP_PATH) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {"hosts": {}}
+
+
+def save_map(data):
+    os.makedirs(os.path.dirname(MAP_PATH), exist_ok=True)
+    tmp = MAP_PATH + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(data, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    os.replace(tmp, MAP_PATH)
+
+
+def hosts_file():
+    """Parse gh's hosts.yml far enough to list logins and the active one per host.
+
+    Only key names are read. Tokens live in the keyring, not in this file.
+    """
+    result = {}
+    try:
+        lines = open(HOSTS_PATH).read().splitlines()
+    except OSError:
+        return result
+    host = None
+    in_users = False
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        key, _, value = line.strip().partition(":")
+        value = value.strip()
+        if indent == 0:
+            host = key
+            result[host] = {"users": [], "active": None}
+            in_users = False
+        elif host and indent == 4:
+            in_users = key == "users"
+            if key == "user":
+                result[host]["active"] = value
+        elif host and indent == 8 and in_users:
+            result[host]["users"].append(key)
+    return result
+
+
+def logins(host):
+    return hosts_file().get(host, {}).get("users", [])
+
+
+def active(host):
+    return hosts_file().get(host, {}).get("active")
+
+
+def token(host, user):
+    try:
+        out = subprocess.run(
+            [REAL_GH, "auth", "token", "--user", user, "--hostname", host],
+            capture_output=True, text=True, env=clean_env(), timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return out.stdout.strip() or None
+
+
+def probe(host, user, owner, repo):
+    """Return (visible, can_push) for one login against owner/repo."""
+    tok = token(host, user)
+    if not tok:
+        return (False, False)
+    env = clean_env()
+    env["GH_TOKEN" if host == "github.com" else "GH_ENTERPRISE_TOKEN"] = tok
+    path = "repos/%s/%s" % (owner, repo) if repo else "orgs/%s" % owner
+    try:
+        out = subprocess.run(
+            [REAL_GH, "api", "--hostname", host, path, "-q", ".permissions.push // false"],
+            capture_output=True, text=True, env=env, timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return (False, False)
+    if out.returncode != 0:
+        return (False, False)
+    return (True, out.stdout.strip() == "true")
+
+
+def learn(host, users, owner, repo):
+    results = {u: probe(host, u, owner, repo) for u in users}
+    log("probe %s/%s: %s" % (host, owner, results))
+    visible = [u for u, (seen, _) in results.items() if seen]
+    if len(visible) == 1:
+        return visible[0]
+    pushers = [u for u, (_, push) in results.items() if push]
+    if len(pushers) == 1:
+        return pushers[0]
+    owners = [u for u in visible if u.lower() == (owner or "").lower()]
+    if len(owners) == 1:
+        return owners[0]
+    return None
+
+
+def resolve(host, owner, repo=None, allow_learn=True):
+    data = load_map()
+    entry = data.setdefault("hosts", {}).setdefault(host, {})
+    owners = entry.get("owners", {})
+    learned = entry.get("learned", {})
+    users = logins(host)
+    if owner:
+        for table in (owners, learned):
+            for key, user in table.items():
+                if key.lower() == owner.lower():
+                    log("%s/%s -> %s (map)" % (host, owner, user))
+                    return user
+    if len(users) <= 1:
+        return users[0] if users else None
+    if owner and allow_learn:
+        user = learn(host, users, owner, repo)
+        if user:
+            learned[owner] = user
+            entry["learned"] = learned
+            save_map(data)
+            log("%s/%s -> %s (learned)" % (host, owner, user))
+            return user
+    return entry.get("default") or active(host)
+
+
+SPEC_URL = re.compile(
+    r"^(?:https?://|ssh://)?(?:[\w.-]+@)?(?P<host>[\w.-]+\.[a-z]+)[/:](?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)"
+)
+
+
+def parse_spec(spec):
+    """Turn owner/repo, host/owner/repo or a clone URL into (host, owner, repo)."""
+    if not spec:
+        return None
+    spec = spec.strip()
+    match = SPEC_URL.match(spec)
+    if match:
+        return match.group("host"), match.group("owner"), strip_suffix(match.group("repo"), ".git")
+    parts = spec.strip("/").split("/")
+    if len(parts) == 3 and "." in parts[0]:
+        return parts[0], parts[1], strip_suffix(parts[2], ".git")
+    if len(parts) == 2 and parts[0] and parts[1]:
+        return "github.com", parts[0], strip_suffix(parts[1], ".git")
+    return None
+
+
+def origin_spec():
+    try:
+        out = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def repo_from_args(args):
+    """Find the repository a gh command targets, or None to fall back to origin."""
+    for i, arg in enumerate(args):
+        if arg in ("-R", "--repo") and i + 1 < len(args):
+            return parse_spec(args[i + 1])
+        if arg.startswith("--repo="):
+            return parse_spec(arg[len("--repo="):])
+        if arg.startswith("-R") and len(arg) > 2 and not arg.startswith("--"):
+            return parse_spec(arg[2:])
+    if os.environ.get("GH_REPO"):
+        return parse_spec(os.environ["GH_REPO"])
+    if not args:
+        return None
+    sub = args[0]
+    positional = [a for a in args[1:] if not a.startswith("-")]
+    if sub == "api":
+        hostname = None
+        for i, arg in enumerate(args):
+            if arg == "--hostname" and i + 1 < len(args):
+                hostname = args[i + 1]
+        for arg in positional:
+            m = re.match(r"^/?repos/([^/]+)/([^/]+)", arg)
+            if m:
+                return hostname or "github.com", m.group(1), m.group(2)
+            m = re.match(r"^/?(?:orgs|users)/([^/]+)", arg)
+            if m:
+                return hostname or "github.com", m.group(1), None
+        return None
+    if sub == "repo" and len(positional) >= 2:
+        return parse_spec(positional[1])
+    return None
+
+
+def pick(args):
+    if not args or args[0] in PASSTHROUGH:
+        print("passthrough")
+        return
+    target = repo_from_args(args)
+    if target is None:
+        target = parse_spec(origin_spec())
+    if target is None:
+        log("no repository in args or cwd")
+        print("passthrough")
+        return
+    host, owner, repo = target
+    user = resolve(host, owner, repo)
+    if not user or user == active(host):
+        log("%s/%s -> %s (active)" % (host, owner, user))
+        print("passthrough")
+        return
+    print("%s %s" % (host, user))
+
+
+def credential(op):
+    fields = {}
+    for line in sys.stdin:
+        line = line.rstrip("\n")
+        if not line:
+            break
+        if "=" in line:
+            key, value = line.split("=", 1)
+            fields[key] = value
+    if op != "get":
+        return
+    host = fields.get("host", "github.com")
+    parts = [p for p in fields.get("path", "").split("/") if p]
+    owner = parts[0] if parts else None
+    repo = strip_suffix(parts[1], ".git") if len(parts) > 1 else None
+    user = fields.get("username")
+    if not user or user not in logins(host):
+        user = resolve(host, owner, repo)
+    if not user:
+        return
+    tok = token(host, user)
+    if not tok:
+        return
+    sys.stdout.write("username=%s\npassword=%s\n" % (user, tok))
+
+
+def main(argv):
+    if not argv:
+        print(__doc__)
+        return 1
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "pick":
+        if rest and rest[0] == "--":
+            rest = rest[1:]
+        pick(rest)
+    elif cmd == "resolve":
+        if len(rest) < 2:
+            print("usage: gh-account resolve HOST OWNER [REPO]", file=sys.stderr)
+            return 2
+        print(resolve(rest[0], rest[1], rest[2] if len(rest) > 2 else None) or "")
+    elif cmd == "credential":
+        credential(rest[0] if rest else "get")
+    elif cmd == "set":
+        if len(rest) != 3:
+            print("usage: gh-account set HOST OWNER USER", file=sys.stderr)
+            return 2
+        data = load_map()
+        entry = data.setdefault("hosts", {}).setdefault(rest[0], {})
+        entry.setdefault("owners", {})[rest[1]] = rest[2]
+        save_map(data)
+        print("%s/%s -> %s" % (rest[0], rest[1], rest[2]))
+    elif cmd == "show":
+        print(json.dumps({"map": load_map(), "logins": hosts_file()}, indent=2, sort_keys=True))
+    else:
+        print(__doc__)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

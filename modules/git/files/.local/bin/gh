@@ -1,0 +1,39 @@
+#!/bin/bash
+# gh wrapper: pick the GitHub account by repository owner, then run the real gh.
+#
+# gh keeps one "active" login per host and any process can flip it. This wrapper
+# asks gh-account which login owns the repository a command targets (from -R,
+# GH_REPO, an api path, or the cwd's origin remote) and hands the real gh that
+# login's token for this one call. Nothing is switched globally and the token is
+# never printed. If anything is unclear, the real gh runs untouched.
+#
+# Install: this file sits early on PATH ahead of the Homebrew gh, for example
+#   ln -s ~/.local/bin/gh /usr/local/bin/gh
+# Opt out for one call with GH_ACCOUNT_DISABLE=1. Debug with GH_ACCOUNT_DEBUG=1.
+
+REAL_GH="${GH_ACCOUNT_REAL_GH:-/opt/homebrew/bin/gh}"
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+RESOLVER="$HERE/gh-account"
+
+passthrough() { exec "$REAL_GH" "$@"; }
+
+[ -x "$REAL_GH" ] || { echo "gh wrapper: real gh not found at $REAL_GH" >&2; exit 127; }
+[ -n "$GH_TOKEN" ] && passthrough "$@"
+[ -n "$GH_ENTERPRISE_TOKEN" ] && passthrough "$@"
+[ -n "$GH_ACCOUNT_DISABLE" ] && passthrough "$@"
+[ -x "$RESOLVER" ] || passthrough "$@"
+
+pick="$("$RESOLVER" pick -- "$@" 2>/dev/null)" || passthrough "$@"
+if [ -z "$pick" ] || [ "$pick" = "passthrough" ]; then passthrough "$@"; fi
+
+host="${pick%% *}"
+user="${pick##* }"
+tok="$("$REAL_GH" auth token --user "$user" --hostname "$host" 2>/dev/null)" || passthrough "$@"
+[ -n "$tok" ] || passthrough "$@"
+[ -n "$GH_ACCOUNT_DEBUG" ] && echo "gh wrapper: $host as $user" >&2
+
+if [ "$host" = "github.com" ]; then
+  GH_TOKEN="$tok" exec "$REAL_GH" "$@"
+else
+  GH_ENTERPRISE_TOKEN="$tok" GH_HOST="$host" exec "$REAL_GH" "$@"
+fi
