@@ -119,7 +119,11 @@ exactly `hermes` and `hermes-platform` are selected because of it, then in a thr
 `hermes doctor` (its exit code is printed as `--- hermes doctor: exit N`), and `check.sh --credentialless`. The child
 environment is an allow-list: no token, key or secret reaches it. `--credentialless` reports `skip doctor:
 skipped-credential ...` when `hermes doctor` exits non-zero only over issues that need credentials or the interactive
-first-run setup; any other issue is still FAIL. The gateway plist is stood in for by a symlink (dotm's stow is covered
+first-run setup, and `skipped-upstream` for npm advisories in upstream's own lockfiles (the first CI run showed 3 of
+doctor's 4 findings at the pin are these; the fix is an upstream lockfile bump that a local fix would not survive, so
+they clear with a pin bump). The raw `hermes doctor` exit stays 1 in the log: that is the finding, not the verdict. Any
+other issue is still FAIL, and the strict `check.sh` (live machine) treats all of them as FAIL. The gateway plist is
+stood in for by a symlink (dotm's stow is covered
 by `macos-fixture`); loading it into launchd is not exercised.
 
 ## Tests

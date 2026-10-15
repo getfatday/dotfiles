@@ -87,9 +87,10 @@ hp_patch_files() { hp_git apply -p1 --numstat "$1" 2>/dev/null | awk -F'\t' '{pr
 # Credentialless doctor verdict (check.sh --credentialless). Reads the output of `hermes doctor`, lists the numbered
 # issues under "Found N issue(s) to address:", and succeeds only when there is at least one and EVERY one needs
 # credentials or the interactive first-run setup (an API key, a token, a login/auth step, `hermes setup`, the .env
-# file). Sets HP_DOCTOR_N and HP_DOCTOR_SUMMARY. Anything else (a broken install, an npm advisory, a missing
-# tool) is not credential-class and keeps the check red.
+# file), or an npm advisory in upstream's lockfiles (class skipped-upstream, below). Sets HP_DOCTOR_N and
+# HP_DOCTOR_SUMMARY. Anything else (a broken install, a missing tool) keeps the check red.
 HP_CRED_RE='api[ _-]?key|api[ _-]?token|token|credential|secret|oauth|log[ -]?in|sign[ -]?in|authenticat|hermes (setup|auth|login|model)|\.env|_API_|_KEY\b'
+HP_UPSTREAM_RE='npm .*vulnerabilit|vulnerabilit(y|ies)'
 hp_doctor_credential_only() {
     local issues other
     issues=$(printf '%s\n' "$1" | sed -E $'s/\033\\[[0-9;]*[A-Za-z]//g' \
@@ -97,7 +98,12 @@ hp_doctor_credential_only() {
     HP_DOCTOR_N=$(printf '%s' "$issues" | grep -c . || true)
     HP_DOCTOR_SUMMARY=$(printf '%s\n' "$issues" | head -3 | cut -c1-70 | paste -sd';' -)
     [ "${HP_DOCTOR_N:-0}" -gt 0 ] || return 1
-    other=$(printf '%s\n' "$issues" | grep -viE "$HP_CRED_RE" || true)
+    # A second class, only ever reached through --credentialless: npm advisories in upstream's own lockfiles. The pin is
+    # fixed and doctor itself says the fix is an upstream lockfile bump that `hermes update` would undo, so nothing in
+    # this repo can clear them; they stay visible (counted, named skipped-upstream) and clear with a pin bump.
+    HP_DOCTOR_CRED_N=$(printf '%s\n' "$issues" | grep -ciE "$HP_CRED_RE" || true)
+    HP_DOCTOR_UP_N=$(printf '%s\n' "$issues" | grep -viE "$HP_CRED_RE" | grep -ciE "$HP_UPSTREAM_RE" || true)
+    other=$(printf '%s\n' "$issues" | grep -viE "$HP_CRED_RE" | grep -viE "$HP_UPSTREAM_RE" || true)
     [ -z "$other" ]
 }
 

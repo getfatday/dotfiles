@@ -191,11 +191,31 @@ doctor_stub 1 <<'EOF'
   Found 2 issue(s) to address:
 
   1. ANTHROPIC_API_KEY is not set (optional)
-  2. npm audit found 3 vulnerabilities in the browser tools
+  2. Hermes entry point is missing
 EOF
 out=$("$C" --credentialless 2>&1); rc=$?
 expect "credentialless check stays red on a non-credential issue" 1 "$rc"
 has "the non-credential doctor failure is a FAIL" "$out" "FAIL  doctor: hermes doctor exit 1"
+doctor_stub 1 <<'EOF'
+  Found 4 issue(s) to address:
+
+  1. Browser tools (agent-browser) has 2 npm vulnerabilities
+  2. web workspace has 7 npm vulnerabilities
+  3. ui-tui workspace has 6 npm vulnerabilities
+  4. Run 'hermes setup' to configure missing API keys for full tool access
+EOF
+"$C" >/dev/null 2>&1; expect "strict check stays red on upstream npm advisories" 1 "$?"
+out=$("$C" --credentialless 2>&1); rc=$?
+expect "credentialless check passes on credential issues plus upstream npm advisories" 0 "$rc"
+has "credentialless check names both classes" "$out" "skip  doctor: skipped-credential + skipped-upstream: hermes doctor exit 1, 4 issue(s): 1 need credentials"
+has "credentialless check counts the upstream advisories" "$out" "3 are npm advisories"
+doctor_stub 1 <<'EOF'
+  Found 2 issue(s) to address:
+
+  1. web workspace has 7 npm vulnerabilities
+  2. Hermes entry point is missing
+EOF
+"$C" --credentialless >/dev/null 2>&1; expect "credentialless check stays red when an advisory sits next to a real fault" 1 "$?"
 doctor_stub 1 <<'EOF'
   something broke before the summary
 EOF

@@ -138,7 +138,11 @@ if [ "$DRY" = 0 ]; then
             out=$(HERMES_HOME="$HERMES_HOME" "$hbin" doctor 2>&1 </dev/null); rc=$?
             if [ "$rc" = 0 ]; then ok doctor "hermes doctor exit 0"
             elif [ "$CREDLESS" = 1 ] && hp_doctor_credential_only "$out"; then
-                skip doctor "skipped-credential: hermes doctor exit $rc, $HP_DOCTOR_N issue(s), every one needs credentials or the first-run setup: $HP_DOCTOR_SUMMARY"
+                if [ "${HP_DOCTOR_UP_N:-0}" = 0 ]; then
+                    skip doctor "skipped-credential: hermes doctor exit $rc, $HP_DOCTOR_N issue(s), every one needs credentials or the first-run setup: $HP_DOCTOR_SUMMARY"
+                else
+                    skip doctor "skipped-credential + skipped-upstream: hermes doctor exit $rc, $HP_DOCTOR_N issue(s): ${HP_DOCTOR_CRED_N:-0} need credentials or the first-run setup, $HP_DOCTOR_UP_N are npm advisories in upstream's lockfiles (cleared by a pin bump): $HP_DOCTOR_SUMMARY"
+                fi
             else no doctor "hermes doctor exit $rc: $(printf '%s\n' "$out" | grep -E 'Found [0-9]+ issue' | head -1 | sed 's/^ *//')"; fi
         fi
     else
