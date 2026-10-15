@@ -146,6 +146,7 @@ def test_repo_profiles_define_the_three_roles_and_mixed_is_the_union():
 # Base modules whose requirements go beyond the platform, and the machine-declared capability
 # each one needs. Requirements are added one PR at a time; every addition extends this map.
 OPT_IN = {"tart": ["virtualization-host"], "session-host": ["session-host"], "hermes": ["hermes-host"],
+          "hermes-platform": ["hermes-host"],
           "litellm": ["llm-proxy-host"], "hermes-discord": ["hermes-discord"]}
 
 
@@ -284,8 +285,30 @@ def test_repo_hermes_is_selected_only_where_hermes_host_is_declared():
         assert without == before, f"role {role}: a machine without the capability changed"
         with_cap = select_modules(base, resolve_capabilities(role, [*DEFAULT_PLATFORM, "hermes-host"], roles),
                                   MODULES_DIR)
-        assert with_cap == sorted(before + ["hermes"]), \
-            f"role {role}: declaring the capability should add exactly hermes"
+        assert with_cap == sorted(before + ["hermes", "hermes-platform"]), \
+            f"role {role}: declaring the capability should add exactly hermes and hermes-platform"
+
+
+def test_repo_hermes_platform_is_selected_only_where_hermes_host_is_declared():
+    """The Hermes platform install (pin, local patch branch, gateway plist): `hermes-platform` joins
+    base_modules requiring `hermes-host`, the same capability as the bridge module and no new one. A Mac
+    that does not declare it resolves exactly the set it resolved before; one that does gains hermes-platform
+    (alongside hermes) and nothing else."""
+    data = yaml.safe_load(PROFILES_YML.read_text())
+    roles = data["role_capabilities"]
+    base = data["base_modules"]
+    assert "hermes-platform" in base
+    config = yaml.safe_load((MODULES_DIR / "hermes-platform" / "config.yml").read_text())
+    assert module_requires(config, "hermes-platform") == ["macos", "hermes-host"]
+    before = sorted(set(base) - set(OPT_IN))
+    for role in [None, *roles]:
+        without = select_modules(base, resolve_capabilities(role, DEFAULT_PLATFORM, roles), MODULES_DIR)
+        assert "hermes-platform" not in without
+        assert without == before, f"role {role}: a machine without the capability changed"
+        with_cap = select_modules(base, resolve_capabilities(role, [*DEFAULT_PLATFORM, "hermes-host"], roles),
+                                  MODULES_DIR)
+        assert "hermes-platform" in with_cap and "hermes" in with_cap
+        assert with_cap == sorted(before + ["hermes", "hermes-platform"])
 
 
 def test_repo_litellm_is_selected_only_where_llm_proxy_host_is_declared():
