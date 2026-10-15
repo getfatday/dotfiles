@@ -2,7 +2,7 @@
   "schema_version": 1,
   "policy_version": "dotm-verification-v1",
   "repository": "getfatday/dotfiles",
-  "required_profiles": ["fast", "macos-fixture", "linux-arm-fixture"],
+  "required_profiles": ["fast", "macos-fixture", "macos-hermes", "linux-arm-fixture"],
   "profiles": {
     "fast": {
       "system": "any",
@@ -14,6 +14,11 @@
     "macos-fixture": {
       "system": "Darwin",
       "checks": [["{python}", ".ci/platform_fixture.py", "macos"]]
+    },
+    "macos-hermes": {
+      "system": "Darwin",
+      "command_timeout_seconds": 1500,
+      "checks": [["{python}", ".ci/hermes_fixture.py"]]
     },
     "linux-arm-fixture": {
       "system": "Linux",

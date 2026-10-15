@@ -20,6 +20,25 @@ if profile == 'macos' and platform.system() != 'Darwin':
 if profile == 'linux-arm' and (platform.system() != 'Linux' or platform.machine().lower() not in {'arm64', 'aarch64'}):
     raise SystemExit('Linux ARM profile requires native ARM Linux')
 role = root / '.ci/vendor/roles/ansible-role-dotmodules'
+# The capability set this profile declares, the same list the machine-side `capabilities:` + platform resolve to. The
+# macOS profile declares `hermes-host`, so the opt-in Hermes modules are selected (and only because of it).
+caps = ['macos', 'brew', 'gui', 'hermes-host'] if profile == 'macos' else ['linux-arm', 'apt', 'headless']
+sys.path.insert(0, str(root / 'modules/dotm/src'))
+from dotm.modules import select_modules  # noqa: E402
+# THIS checkout's profiles.yml: dotm's own lookup follows ~/.config/dotm (a machine's repo), which a runner lacks.
+base_modules = yaml.safe_load((root / 'playbooks/profiles.yml').read_text())['base_modules']
+selected = select_modules(base_modules, set(caps), root / 'modules')
+print(f'{profile}: capabilities {caps}; {len(selected)} real modules selected (selection only, never applied here)')
+if profile == 'macos':
+    missing = {'hermes', 'hermes-platform'} - set(selected)
+    if missing:
+        raise SystemExit(f'hermes-host is declared but {sorted(missing)} not selected')
+    without = set(select_modules(base_modules, set(caps) - {'hermes-host'}, root / 'modules'))
+    if {'hermes', 'hermes-platform'} & without:
+        raise SystemExit('hermes modules are selected without hermes-host: the capability gate is broken')
+    print('macos: hermes, hermes-platform selected with hermes-host and not without it')
+elif {'hermes', 'hermes-platform'} & set(selected):
+    raise SystemExit('linux-arm must not select the macOS-only Hermes modules')
 install_info = yaml.safe_load((role / 'meta/.galaxy_install_info').read_text())
 if install_info.get('version') != '28cdf7a7d58ccd1b9b985d09a5d4387f120bc412':
     raise SystemExit('Unexpected role revision')
@@ -37,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='dotm-ci-', dir=os.environ['RUNNER_TEMP'
                       'ansible_python_interpreter': sys.executable,
                       'dotmodules_repo': 'file://' + str(modules), 'dotmodules_dest': str(home / '.dotmodules'),
                       'dotmodules_install': ['ci-smoke'], 'dotmodules_skip_mas_role': True,
-                      'dotm_platform': ['macos','brew','gui'] if profile == 'macos' else ['linux-arm','apt','headless']},
+                      'dotm_platform': caps},
              'roles': ['ansible-role-dotmodules']}]
     playbook = temp / 'fixture.yml'
     playbook.write_text(yaml.safe_dump(play))
