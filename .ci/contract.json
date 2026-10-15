@@ -2,8 +2,14 @@
   "schema_version": 1,
   "policy_version": "dotm-verification-v1",
   "repository": "getfatday/dotfiles",
-  "required_profiles": ["fast", "macos-fixture", "linux-arm-fixture"],
+  "required_profiles": ["fast", "macos-fixture", "linux-arm-fixture", "tdd"],
   "profiles": {
+    "tdd": {
+      "system": "any",
+      "checks": [
+        ["{python}", ".ci/tdd_guard.py", "--base", "origin/main", "--head", "HEAD"]
+      ]
+    },
     "fast": {
       "system": "any",
       "checks": [

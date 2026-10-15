@@ -1,0 +1,17 @@
+diff --git a/modules/example/setup.sh b/modules/example/setup.sh
+index 1111111..2222222 100755
+--- a/modules/example/setup.sh
++++ b/modules/example/setup.sh
+@@ -1,3 +1,4 @@
+ #!/usr/bin/env bash
+ set -euo pipefail
+-echo "setup"
++# handle a missing HOME
++echo "setup ${HOME:-/tmp}"
+diff --git a/docs/example.md b/docs/example.md
+index 3333333..4444444 100644
+--- a/docs/example.md
++++ b/docs/example.md
+@@ -1 +1,2 @@
+ # example
++The setup script falls back to /tmp when HOME is unset.
