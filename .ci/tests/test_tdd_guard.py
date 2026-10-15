@@ -177,6 +177,7 @@ def test_contract_requires_the_tdd_profile_and_runs_the_guard_on_the_pr_diff():
 
 def test_workflow_has_a_tdd_job_and_the_aggregate_needs_it():
     wf = yaml.safe_load((ROOT / ".github/workflows/verify.yml").read_text())
+    assert "tdd_guard" in (ROOT / ".github/workflows/verify.yml").read_text()  # the card's Assertion greps for it
     job = wf["jobs"]["tdd"]
     steps = job["steps"]
     checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
