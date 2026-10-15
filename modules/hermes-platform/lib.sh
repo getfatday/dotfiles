@@ -23,6 +23,11 @@ hp_init_env() {
     HP_DIR="${HERMES_PLATFORM_DIR:-$HERMES_HOME/hermes-agent}"
     HP_REPO_URL="${HERMES_REPO_URL:-$HP_UPSTREAM_DEFAULT}"
     HP_LEDGER="${HERMES_PLATFORM_LEDGER:-$HOME/src/hyp-hermes/ledger/local-patches.jsonl}"
+    # No lab repo on this machine (a clean Mac, CI): fall back to the copy vendored in this module (vendor-sync.sh keeps
+    # it faithful). Only when the variable is unset; an explicit HERMES_PLATFORM_LEDGER that is missing stays an error.
+    if [ -z "${HERMES_PLATFORM_LEDGER:-}" ] && [ ! -f "$HP_LEDGER" ] && [ -f "$HP_MODULE_DIR/vendor/ledger/local-patches.jsonl" ]; then
+        HP_LEDGER="$HP_MODULE_DIR/vendor/ledger/local-patches.jsonl"
+    fi
     HP_PATCH_ROOT="${HERMES_PLATFORM_PATCH_ROOT:-$(dirname "$(dirname "$HP_LEDGER")")}"
     HP_LA_DIR="${HERMES_PLATFORM_LAUNCH_AGENT_DIR:-$HOME/Library/LaunchAgents}"
 }
@@ -78,6 +83,23 @@ hp_patch_applied() { hp_git apply -p1 -R --check "$1" >/dev/null 2>&1; }
 
 # Sorted unique file names a patch touches.
 hp_patch_files() { hp_git apply -p1 --numstat "$1" 2>/dev/null | awk -F'\t' '{print $3}' | sort -u; }
+
+# Credentialless doctor verdict (check.sh --credentialless). Reads the output of `hermes doctor`, lists the numbered
+# issues under "Found N issue(s) to address:", and succeeds only when there is at least one and EVERY one needs
+# credentials or the interactive first-run setup (an API key, a token, a login/auth step, `hermes setup`, the .env
+# file). Sets HP_DOCTOR_N and HP_DOCTOR_SUMMARY. Anything else (a broken install, an npm advisory, a missing
+# tool) is not credential-class and keeps the check red.
+HP_CRED_RE='api[ _-]?key|api[ _-]?token|token|credential|secret|oauth|log[ -]?in|sign[ -]?in|authenticat|hermes (setup|auth|login|model)|\.env|_API_|_KEY\b'
+hp_doctor_credential_only() {
+    local issues other
+    issues=$(printf '%s\n' "$1" | sed -E $'s/\033\\[[0-9;]*[A-Za-z]//g' \
+        | awk '/Found [0-9]+ issue/ {f=1; next} f && /^ *[0-9]+\. / {sub(/^ *[0-9]+\. /, ""); print}')
+    HP_DOCTOR_N=$(printf '%s' "$issues" | grep -c . || true)
+    HP_DOCTOR_SUMMARY=$(printf '%s\n' "$issues" | head -3 | cut -c1-70 | paste -sd';' -)
+    [ "${HP_DOCTOR_N:-0}" -gt 0 ] || return 1
+    other=$(printf '%s\n' "$issues" | grep -viE "$HP_CRED_RE" || true)
+    [ -z "$other" ]
+}
 
 hp_rebase_hint() {
     cat >&2 <<EOF

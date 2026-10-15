@@ -84,7 +84,7 @@ def run(profile):
         log = out / f'{profile}-{i}.log'
         try:
             p = subprocess.run(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                               timeout=spec['command_timeout_seconds'])
+                               timeout=selected.get('command_timeout_seconds', spec['command_timeout_seconds']))
             code, data = p.returncode, p.stdout
         except subprocess.TimeoutExpired:
             code, data = 124, b'Command timed out; verification failed.\n'

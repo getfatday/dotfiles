@@ -34,8 +34,8 @@ which names a profile dir inside agent sessions), `HERMES_PLATFORM_DIR` (default
 `$HERMES_PLATFORM_HOME/hermes-agent`), `HERMES_REPO_URL` (default upstream on GitHub),
 `HERMES_PLATFORM_LEDGER` (default `~/src/hyp-hermes/ledger/local-patches.jsonl`),
 `HERMES_PLATFORM_PATCH_ROOT` (default: the ledger's repo root; ledger `patch_file` is relative to it).
-A machine without the lab repo cannot set up or check the patches: setup fails with exit 2 and says so
-rather than installing an unpatched Hermes under a patched pin.
+A machine with neither the lab repo nor the module's `vendor/` copy cannot set up or check the patches: setup fails with
+exit 2 and says so rather than installing an unpatched Hermes under a patched pin.
 
 ## What setup does, in order
 
@@ -96,6 +96,31 @@ Known limits of the stowed plist, all inherited from the installer's own file:
   the gateway starts through `.hermes/bin/hermes`, which does not depend on it, but the plist then
   drifts from reality until it is recaptured. Today the hash in the file
   (`environments/0a7fda8e...`) is already not the one on disk (`ab693e6d...`).
+
+## Vendored patches (no lab repo needed)
+
+`vendor/` is a faithful copy of the lab's `ledger/local-patches.jsonl` and of every non-retired patch file it names,
+under the same relative paths (`vendor/ledger/local-patches.jsonl`, `vendor/experiments/<id>/<name>.patch`), so the
+ledger's `patch_file` values resolve against `vendor/` unchanged. When `HERMES_PLATFORM_LEDGER` is unset and the
+lab's ledger is not on the machine, the scripts fall back to it; CI sets it explicitly.
+
+Sync rule: whenever the lab's ledger changes (a patch added, retired, or rebased onto a new pin), run
+`modules/hermes-platform/vendor-sync.sh` (copies lab to vendor, removes vendored patches no live row names) and commit
+`vendor/` together with the `pin.txt` bump if there is one. `vendor-sync.sh --check` is read-only and exits 1 on any
+difference; run it before pushing a pin bump. A stale copy fails CI (the restored install no longer matches the
+patches the lab says it carries), it does not install quietly unpatched.
+
+## CI restore proof
+
+`.github/workflows/verify.yml` job `macos-hermes` (profile `macos-hermes` in `.ci/contract.json`, driver
+`.ci/hermes_fixture.py`) runs on a clean hosted Mac, which is the clean machine: it declares `hermes-host`, checks that
+exactly `hermes` and `hermes-platform` are selected because of it, then in a throwaway HOME runs `setup.sh` (clone at
+`pin.txt`, patch branch from `vendor/`, official installer stages), a second `setup.sh` (must change nothing),
+`hermes doctor` (its exit code is printed as `--- hermes doctor: exit N`), and `check.sh --credentialless`. The child
+environment is an allow-list: no token, key or secret reaches it. `--credentialless` reports `skip doctor:
+skipped-credential ...` when `hermes doctor` exits non-zero only over issues that need credentials or the interactive
+first-run setup; any other issue is still FAIL. The gateway plist is stood in for by a symlink (dotm's stow is covered
+by `macos-fixture`); loading it into launchd is not exercised.
 
 ## Tests
 

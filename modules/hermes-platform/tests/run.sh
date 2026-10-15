@@ -168,6 +168,39 @@ has "second setup skips the bootstrap" "$out" "marker matches HEAD"
 expect "installer was not run twice" 3 "$(wc -l < "$HERMES_PLATFORM_HOME/stages.log" | tr -d ' ')"
 out=$("$S" --dry-run 2>&1); has "dry-run on a done install says nothing to do" "$out" "marker matches HEAD"
 
+# 9 --credentialless: a doctor that exits 1 only over credentials / first-run setup is `skip`, anything else stays red
+HB=$INST3/.hermes/bin/hermes
+doctor_stub() { { printf '#!/bin/sh\ncat <<'"'"'EOT'"'"'\n'; cat; printf 'EOT\nexit %s\n' "$1"; } > "$HB"; chmod +x "$HB"; }
+doctor_stub 0 <<'EOF'
+  All checks passed!
+EOF
+out=$("$C" --credentialless 2>&1); rc=$?
+expect "credentialless check is plain ok on a clean doctor" 0 "$rc"
+has "clean doctor is ok, not skip" "$out" "ok    doctor: hermes doctor exit 0"
+doctor_stub 1 <<'EOF'
+  Found 2 issue(s) to address:
+
+  1. ANTHROPIC_API_KEY is not set (optional)
+  2. Run `hermes setup` to configure a provider
+EOF
+"$C" >/dev/null 2>&1; expect "strict check stays red on a doctor that exits 1" 1 "$?"
+out=$("$C" --credentialless 2>&1); rc=$?
+expect "credentialless check passes when every issue needs credentials" 0 "$rc"
+has "credentialless check says skipped-credential" "$out" "skip  doctor: skipped-credential: hermes doctor exit 1, 2 issue(s)"
+doctor_stub 1 <<'EOF'
+  Found 2 issue(s) to address:
+
+  1. ANTHROPIC_API_KEY is not set (optional)
+  2. npm audit found 3 vulnerabilities in the browser tools
+EOF
+out=$("$C" --credentialless 2>&1); rc=$?
+expect "credentialless check stays red on a non-credential issue" 1 "$rc"
+has "the non-credential doctor failure is a FAIL" "$out" "FAIL  doctor: hermes doctor exit 1"
+doctor_stub 1 <<'EOF'
+  something broke before the summary
+EOF
+"$C" --credentialless >/dev/null 2>&1; expect "credentialless check stays red when doctor lists no issues" 1 "$?"
+
 echo
 echo "hermes-platform tests: $pass passed, $failn failed"
 [ "$failn" = 0 ]

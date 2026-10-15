@@ -6,6 +6,11 @@
 #                         Does not look at the install; safe on any machine that has the repo.
 #   check.sh --no-doctor  full check but skip `hermes doctor` (scratch installs that are not bootstrapped)
 #   check.sh --json       one JSON line instead of the report (same exit code)
+#   check.sh --credentialless
+#                         a machine with no credentials and no first-run setup (the CI restore proof). `hermes doctor`
+#                         still runs; when it exits non-zero ONLY because of issues that need credentials or the
+#                         interactive first-run setup, the check reports `skip doctor: skipped-credential ...` and does
+#                         not fail. Any other issue is still FAIL. A clean doctor is still plain `ok`.
 #
 # Full check, per the module contract:
 #   install dir exists and is a git checkout; HEAD is on local/hermes-patches; the pin is an ancestor
@@ -18,11 +23,12 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=lib.sh
 . "$HERE/lib.sh"
 
-DRY=0 DOCTOR=1 JSON=0
+DRY=0 DOCTOR=1 JSON=0 CREDLESS=0
 for a in "$@"; do
     case "$a" in
         --dry-run) DRY=1 ;;
         --no-doctor) DOCTOR=0 ;;
+        --credentialless) CREDLESS=1 ;;
         --json) JSON=1 ;;
         -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $a" >&2; exit 2 ;;
@@ -39,6 +45,7 @@ rec() { # status name detail
     return 0
 }
 ok() { rec ok "$1" "$2"; }
+skip() { rec skip "$1" "$2"; }
 no() { rec FAIL "$1" "$2"; }
 
 # --- module structure (both modes) -----------------------------------------------------------
@@ -130,6 +137,8 @@ if [ "$DRY" = 0 ]; then
         else
             out=$(HERMES_HOME="$HERMES_HOME" "$hbin" doctor 2>&1 </dev/null); rc=$?
             if [ "$rc" = 0 ]; then ok doctor "hermes doctor exit 0"
+            elif [ "$CREDLESS" = 1 ] && hp_doctor_credential_only "$out"; then
+                skip doctor "skipped-credential: hermes doctor exit $rc, $HP_DOCTOR_N issue(s), every one needs credentials or the first-run setup: $HP_DOCTOR_SUMMARY"
             else no doctor "hermes doctor exit $rc: $(printf '%s\n' "$out" | grep -E 'Found [0-9]+ issue' | head -1 | sed 's/^ *//')"; fi
         fi
     else
