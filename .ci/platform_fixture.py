@@ -24,14 +24,16 @@ role = root / '.ci/vendor/roles/ansible-role-dotmodules'
 # macOS profile declares `hermes-host`, so the opt-in Hermes modules are selected (and only because of it).
 caps = ['macos', 'brew', 'gui', 'hermes-host'] if profile == 'macos' else ['linux-arm', 'apt', 'headless']
 sys.path.insert(0, str(root / 'modules/dotm/src'))
-from dotm.modules import get_deploy_modules, select_modules  # noqa: E402
-selected = select_modules(get_deploy_modules(), set(caps), root / 'modules')
+from dotm.modules import select_modules  # noqa: E402
+# THIS checkout's profiles.yml: dotm's own lookup follows ~/.config/dotm (a machine's repo), which a runner lacks.
+base_modules = yaml.safe_load((root / 'playbooks/profiles.yml').read_text())['base_modules']
+selected = select_modules(base_modules, set(caps), root / 'modules')
 print(f'{profile}: capabilities {caps}; {len(selected)} real modules selected (selection only, never applied here)')
 if profile == 'macos':
     missing = {'hermes', 'hermes-platform'} - set(selected)
     if missing:
         raise SystemExit(f'hermes-host is declared but {sorted(missing)} not selected')
-    without = set(select_modules(get_deploy_modules(), set(caps) - {'hermes-host'}, root / 'modules'))
+    without = set(select_modules(base_modules, set(caps) - {'hermes-host'}, root / 'modules'))
     if {'hermes', 'hermes-platform'} & without:
         raise SystemExit('hermes modules are selected without hermes-host: the capability gate is broken')
     print('macos: hermes, hermes-platform selected with hermes-host and not without it')

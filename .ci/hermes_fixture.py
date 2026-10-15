@@ -59,10 +59,12 @@ def step(name, argv, env, timeout, cwd=root):
 
 # 1. selection ---------------------------------------------------------------------------------------------------
 sys.path.insert(0, str(root / 'modules/dotm/src'))
-from dotm.modules import get_deploy_modules, select_modules  # noqa: E402
+from dotm.modules import select_modules  # noqa: E402
 
-selected = set(select_modules(get_deploy_modules(), CAPS, root / 'modules'))
-without = set(select_modules(get_deploy_modules(), CAPS - {'hermes-host'}, root / 'modules'))
+# THIS checkout's profiles.yml, not dotm's machine lookup (~/.config/dotm), which a runner does not have.
+base_modules = yaml.safe_load((root / 'playbooks/profiles.yml').read_text())['base_modules']
+selected = set(select_modules(base_modules, CAPS, root / 'modules'))
+without = set(select_modules(base_modules, CAPS - {'hermes-host'}, root / 'modules'))
 print(f'=== selection\ncapabilities: {sorted(CAPS)}\nhermes modules selected: {sorted({"hermes", "hermes-platform"} & selected)}')
 print(f'selected without hermes-host: {sorted({"hermes", "hermes-platform"} & without)}')
 if {'hermes', 'hermes-platform'} - selected or {'hermes', 'hermes-platform'} & without:
