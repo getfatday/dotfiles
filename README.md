@@ -104,6 +104,24 @@ module-name/
 | `node` | Node.js development | node, npm, yarn, pnpm |
 | `go` | Go development | go, goreleaser, golangci-lint |
 
+## Fleet inventory and bootstrap
+
+`inventory/fleet.yml` is the Ansible inventory and the fleet registry in one file: per host its class, home
+(`eg` | `personal`), capabilities, agents by scope, repos, backup target, peer gateway and ssh user/host/key
+*name* (never a key). A host is in the fleet only if it has a row; adding one is a PR. `ansible.cfg` points at it.
+
+```bash
+ansible-playbook playbooks/bootstrap.yml -l <host> --check   # read-only; changed=0 on a converged host
+ansible-playbook playbooks/bootstrap.yml -l <host>           # converge: dotm capabilities, repos, dotm sync, agent scopes
+ansible-playbook playbooks/bootstrap.yml -l <host> --tags verify   # dotm verify + hermes doctor
+ansible <host> -m ping
+```
+
+The playbook refuses to run without `-l` naming exactly one host, refuses an inventory row that lists agent
+scopes outside its home (a personal host never gets `work` scope agents), and writes only the `capabilities`
+key of the machine-local `~/.config/dotm/config.yml`. Tests: `python -m pytest .ci/tests/test_fleet.py`
+(part of the `fast` CI profile). The hermes-agents `it` agent owns this file and these playbooks.
+
 ## Configuration
 
 Each module's `config.yml` file defines:

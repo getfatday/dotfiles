@@ -1,0 +1,260 @@
+---
+# playbooks/bootstrap.yml: converge ONE fleet host from inventory/fleet.yml.
+#
+#   ansible-playbook playbooks/bootstrap.yml -l <host>            apply
+#   ansible-playbook playbooks/bootstrap.yml -l <host> --check    read-only; clean (changed=0) on a converged host
+#   ansible-playbook playbooks/bootstrap.yml -l <host> --tags verify    daily health check (dotm verify, hermes doctor)
+#
+# What it does, in order (every step is idempotent):
+#   1. guards      the host is in the inventory, run with -l for exactly one host, its row is well
+#                  formed, and no agent scope outside its home is listed (a personal host never
+#                  carries a `work` scope agent).
+#   2. dotm config ~/.config/dotm/config.yml `capabilities` = the host's declared dotm capabilities.
+#                  Other keys (role, excluded_modules, sync ...) are preserved; machine-local values
+#                  are not touched.
+#   3. repos       ~/src/dotfiles (public, https) and ~/src/hermes-agents (private; needs `gh` signed
+#                  in on the host) are cloned if absent. Existing checkouts are never touched here.
+#   4. apply       `dotm sync` (the modules the capabilities select), then hermes-agents
+#                  scripts/sync.sh --scope <each scope of the host's home>. Skipped under --check.
+#   5. plan check  (--check only) build the host's agent scopes into a scratch dir and require that
+#                  every agent the inventory lists for the host builds.
+#
+# Credentials: none live here. Anything a module needs resolves op:// references through the host's
+# own 1Password service-account token, never through this playbook.
+# Overrides (tests, scratch runs): -e hermes_agents_dir=<path> -e dotfiles_dir=<path>.
+- name: Bootstrap one fleet host
+  hosts: all
+  gather_facts: false
+  vars_files:
+    - profiles.yml
+  vars:
+    host_home_dir: "{{ ansible_facts.env.HOME }}"
+    dotm_config_file: "{{ host_home_dir }}/.config/dotm/config.yml"
+    dotfiles_dir: "{{ host_home_dir }}/src/dotfiles"
+    hermes_agents_dir: "{{ host_home_dir }}/src/hermes-agents"
+    dotfiles_remote: https://github.com/getfatday/dotfiles.git
+    hermes_agents_slug: getfatday/hermes-agents
+    exec_path: "{{ host_home_dir }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts.env.PATH }}"
+    known_scopes: [personal, work, bridge]
+
+  pre_tasks:
+    - name: Refuse to run without -l naming exactly one inventory host
+      ansible.builtin.assert:
+        that:
+          - ansible_limit is defined
+          - ansible_play_hosts_all | length == 1
+          - inventory_hostname in groups['all']
+        fail_msg: >-
+          bootstrap.yml converges one host at a time: run it with -l <host> where <host> is a row in
+          inventory/fleet.yml (a host that is not in the inventory is not in the fleet).
+      tags: [always]
+
+    - name: Gather the minimum facts (HOME, PATH); the full set is slow and unused
+      ansible.builtin.setup:
+        gather_subset: [min]
+      tags: [always]
+
+    - name: Check the host's registry row
+      ansible.builtin.assert:
+        that:
+          - class in fleet_classes
+          - home in fleet_homes
+          - capabilities is sequence and capabilities is not string
+          - agents is mapping
+          - agents.keys() | list | difference(known_scopes) | length == 0
+          - peer_gateway is string and peer_gateway | length > 0
+          - backup_target is string
+          - ssh is mapping
+          - ssh.user is string and ssh.host is string
+          - ssh.key is string and ssh.key is match('^[A-Za-z0-9._-]+$')
+          - capabilities | difference(declared_capabilities + informational_capabilities) | length == 0
+        fail_msg: >-
+          inventory/fleet.yml row for {{ inventory_hostname }} is malformed: check class, home,
+          capabilities (declared_capabilities in playbooks/profiles.yml or informational_capabilities),
+          agents scopes, peer_gateway, backup_target and ssh {user, host, key NAME}.
+      tags: [always]
+
+    - name: Refuse agents outside the host's home (work/personal boundary)
+      ansible.builtin.assert:
+        that:
+          - item.key in home_scopes[home] or item.value | length == 0
+        fail_msg: >-
+          {{ inventory_hostname }} is home={{ home }} and may carry scopes {{ home_scopes[home] | join(', ') }};
+          the inventory lists {{ item.value | join(', ') }} under scope '{{ item.key }}'.
+      loop: "{{ agents | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      tags: [always]
+
+    - name: Resolve what this host's home may carry
+      ansible.builtin.set_fact:
+        host_scopes: "{{ home_scopes[home] }}"
+        host_agents: "{{ agents.values() | flatten | unique | sort }}"
+        dotm_caps_want: "{{ capabilities | select('in', declared_capabilities) | unique | sort | list }}"
+      tags: [always]
+
+    - name: Build the --scope arguments for hermes-agents
+      ansible.builtin.set_fact:
+        scope_args: "{{ host_scopes | map('regex_replace', '^(.*)$', '--scope=\\1') | list }}"
+      tags: [always]
+
+  tasks:
+    # 2. dotm machine-local config
+    - name: Read the machine-local dotm config
+      ansible.builtin.slurp:
+        src: "{{ dotm_config_file }}"
+      register: dotm_cfg_raw
+      failed_when: false
+
+    - name: Work out the config this host should have
+      ansible.builtin.set_fact:
+        dotm_cfg_now: >-
+          {{ ((dotm_cfg_raw.content | b64decode | from_yaml) if dotm_cfg_raw.content is defined else {}) | default({}, true) }}
+    - name: Compare the config with the inventory
+      ansible.builtin.set_fact:
+        dotm_cfg_now_norm: >-
+          {{ dotm_cfg_now | combine({'capabilities': (dotm_cfg_now.capabilities | default([], true) | sort | list)}) }}
+        dotm_cfg_want: >-
+          {{ {'dotfiles_repo': '~/src/dotfiles'} | combine(dotm_cfg_now) | combine({'capabilities': dotm_caps_want}) }}
+
+    - name: Ensure the dotm config directory exists
+      ansible.builtin.file:
+        path: "{{ dotm_config_file | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write dotm capabilities from the inventory
+      ansible.builtin.copy:
+        dest: "{{ dotm_config_file }}"
+        content: "{{ dotm_cfg_want | to_nice_yaml(indent=2) }}"
+        mode: "0644"
+      when: dotm_cfg_want != dotm_cfg_now_norm
+
+    # 3. repositories
+    - name: Look for the dotfiles checkout
+      ansible.builtin.stat:
+        path: "{{ dotfiles_dir }}/.git"
+      register: dotfiles_git
+
+    - name: Clone dotfiles when absent
+      ansible.builtin.git:
+        repo: "{{ dotfiles_remote }}"
+        dest: "{{ dotfiles_dir }}"
+        version: main
+        update: false
+      when: not dotfiles_git.stat.exists
+
+    - name: Look for the hermes-agents checkout
+      ansible.builtin.stat:
+        path: "{{ hermes_agents_dir }}/.git"
+      register: hermes_agents_git
+
+    - name: Clone hermes-agents when absent (private; the host's own gh login, never a token from here)
+      ansible.builtin.command:
+        argv: [gh, repo, clone, "{{ hermes_agents_slug }}", "{{ hermes_agents_dir }}"]
+        creates: "{{ hermes_agents_dir }}/.git"
+      environment:
+        PATH: "{{ exec_path }}"
+      when: "'hermes-host' in capabilities"
+
+    # 4. apply (never under --check)
+    - name: Locate dotm
+      ansible.builtin.stat:
+        path: "{{ host_home_dir }}/.local/bin/dotm"
+      register: dotm_bin
+
+    - name: Apply the modules the capabilities select (dotm sync)
+      ansible.builtin.shell: |
+        set -eu
+        before=$(git -C "{{ dotfiles_dir }}" rev-parse HEAD)
+        {% if dotm_bin.stat.exists %}
+        dotm sync --quiet
+        {% else %}
+        uv run --project "{{ dotfiles_dir }}/modules/dotm/src" dotm sync --quiet
+        {% endif %}
+        after=$(git -C "{{ dotfiles_dir }}" rev-parse HEAD)
+        echo "$before $after"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ exec_path }}"
+      register: dotm_sync
+      changed_when: dotm_sync.stdout_lines[-1].split()[0] != dotm_sync.stdout_lines[-1].split()[1]
+      when: not ansible_check_mode
+
+    - name: Install this home's agent scopes (hermes-agents sync.sh)
+      ansible.builtin.command:
+        argv: "{{ [hermes_agents_dir ~ '/scripts/sync.sh'] + scope_args }}"
+      environment:
+        PATH: "{{ exec_path }}"
+      register: agents_sync
+      # sync.sh re-installs every profile in place; only a first install is a change.
+      changed_when: "'== installing' in agents_sync.stdout"
+      when:
+        - not ansible_check_mode
+        - "'hermes-host' in capabilities"
+
+    # 5. plan check (read-only; runs under --check)
+    - name: Find a python3 that can import yaml (build.py needs PyYAML)
+      ansible.builtin.command:
+        argv: [python3, -c, "import yaml"]
+      environment:
+        PATH: "{{ exec_path }}"
+      check_mode: false
+      changed_when: false
+      failed_when: false
+      register: python_yaml
+      when: ansible_check_mode
+
+    - name: Build this home's agent scopes into a scratch directory
+      ansible.builtin.command:
+        argv: >-
+          {{ (['python3'] if python_yaml.rc == 0 else ['uv', 'run', '--quiet', '--with', 'pyyaml', 'python3'])
+             + [hermes_agents_dir ~ '/scripts/build.py', '--via', 'direct'] + scope_args }}
+      environment:
+        PATH: "{{ exec_path }}"
+        HERMES_AGENTS_DIST: "{{ host_home_dir }}/.cache/fleet-bootstrap-dist"
+      check_mode: false
+      changed_when: false
+      register: agents_plan
+      when:
+        - ansible_check_mode
+        - "'hermes-host' in capabilities"
+        - hermes_agents_git.stat.exists
+
+    - name: Read the built agent names
+      ansible.builtin.slurp:
+        src: "{{ host_home_dir }}/.cache/fleet-bootstrap-dist/.built"
+      register: agents_built_raw
+      when: agents_plan is not skipped
+
+    - name: Require every agent the inventory lists for this host to build
+      ansible.builtin.assert:
+        that:
+          - host_agents | difference((agents_built_raw.content | b64decode).split()) | length == 0
+        fail_msg: >-
+          {{ inventory_hostname }} lists agents that do not build for scopes {{ host_scopes | join(', ') }}:
+          {{ host_agents | difference((agents_built_raw.content | b64decode).split()) | join(', ') }}
+      when: agents_plan is not skipped
+
+    # daily health check: `--tags verify` (never part of a plain run)
+    - name: dotm verify (read-only)
+      ansible.builtin.command:
+        argv: [dotm, verify]
+      environment:
+        PATH: "{{ exec_path }}"
+      check_mode: false
+      changed_when: false
+      register: verify_dotm
+      tags: [never, verify]
+
+    - name: hermes doctor (read-only)
+      ansible.builtin.command:
+        argv: [hermes, doctor]
+      environment:
+        PATH: "{{ exec_path }}"
+      check_mode: false
+      changed_when: false
+      register: verify_doctor
+      when: "'hermes-host' in capabilities"
+      tags: [never, verify]
