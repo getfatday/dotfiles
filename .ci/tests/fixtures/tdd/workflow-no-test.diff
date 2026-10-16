@@ -1,0 +1,8 @@
+diff --git a/.github/workflows/verify.yml b/.github/workflows/verify.yml
+index 1111111..2222222 100644
+--- a/.github/workflows/verify.yml
++++ b/.github/workflows/verify.yml
+@@ -1,2 +1,3 @@
+ name: dotm verification
++# a changed workflow with no test
+ on:

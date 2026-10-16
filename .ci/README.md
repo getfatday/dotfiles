@@ -6,13 +6,14 @@ Implemented locally; no workflow has been pushed or run on GitHub. No branch pro
 
 `contract.json` is the reviewed repo manifest and policy version. All models use the same commands. `verify.py run PROFILE` executes fixed argv with timeouts and records exit codes, log hashes, dependency environment, commit, input-tree hash (including untracked/nonignored changes and executable bits), and manifest hash. `verify.py accept` rejects absent/duplicate profiles, skipped/failed/cancelled jobs, changed inputs, stale commit/contract, expired receipts, different workflow run/attempt, missing command evidence and altered logs. Model prose cannot satisfy these checks.
 
-The stable check is **dotm-acceptance**. It runs even when a dependency fails and requires all three profiles. No path-filter skips or continue-on-error are used. New content invalidates earlier receipts. Results live in ignored `.ci/results/`, uploaded for seven days. Logs come only from synthetic fixtures/tests; never place credentials in test fixtures.
+The stable check is **dotm-acceptance**. It runs even when a dependency fails and requires all four profiles. No path-filter skips or continue-on-error are used. New content invalidates earlier receipts. Results live in ignored `.ci/results/`, uploaded for seven days. Logs come only from synthetic fixtures/tests; never place credentials in test fixtures.
 
 | Profile | Required coverage | Explicit exclusions |
 | --- | --- | --- |
 | fast / Ubuntu x64 | Python syntax, YAML/module configuration, full dotm tests and negative gate tests | No production apply |
 | macos-fixture / macos-14 ARM | Pinned dotmodules role applies a synthetic root-level dotfile to temporary HOME; link/content checks; second apply must report changed=0 | No Homebrew/MAS/package installs, preferences, services, credentials, production deploy.yml or full Mac qualification |
 | linux-arm-fixture / Ubuntu 24.04 ARM | Native ARM platform/role-selection unit tests and the same pinned-role state/idempotence fixture | No APT package installs, Pi hardware, boot/device/service validation |
+| tdd / Ubuntu x64 | `.ci/tdd_guard.py --base origin/main --head HEAD`: a change to module scripts, dotm source, `.ci/*.py` or workflows must change a test (`modules/dotm/src/tests/**`, `.ci/tests/**`, `modules/*/tests/**`) in the same PR, or carry a `tdd-exempt: <reason>` line in a commit message or the PR body (the exemption is printed as `FINDING F-TDD-1`, never silent) | Stdlib only; classification is the `DEFAULT_CFG` globs in the guard; vendored from the hyp-hermes lab (commit in the file header) |
 
 Platform fixtures refuse ordinary local invocation, use disposable hosted runners and a unique temporary HOME, and never select real user modules. This guard prevents accidental use; it is not a security sandbox against someone who can change the workflow or environment. Production apply remains separately authorized and must have affected-module `dotm verify` plus relevant behavior checks on the actual target.
 

@@ -7,5 +7,9 @@
 #   <token file> (default ~/.hermes/.op.env)  OP_SERVICE_ACCOUNT_TOKEN=…  written by `op-agent-sign bootstrap`
 # After `dotm sync` run once:  op-agent-sign setup && op-agent-sign bootstrap && op-agent-sign doctor
 requires: [macos]
+# The module's own dependency, declared so `requires: [macos]` has the package that justifies it (the
+# landing contract in test_role.py). The 1password module installs the same cask; brew is idempotent.
+homebrew_casks:
+  - 1password-cli                 # `op`, used by the signing wrapper and bootstrap
 stow_dirs:
   - op-agent-sign
