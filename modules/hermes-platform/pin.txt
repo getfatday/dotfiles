@@ -1,0 +1,4 @@
+# Upstream commit of NousResearch/hermes-agent the install is built on (short: 2038bd92d2).
+# The local patch branch sits on top of exactly this commit. Bump it only together with a rebase of
+# local/hermes-patches (see README.md, "Rebase rule").
+2038bd92d26d06ab3df622dd9155be7296ba5187

@@ -1,0 +1,34 @@
+---
+# Hermes platform module
+# The Hermes Agent INSTALL itself, restorable from this repo: the pinned upstream checkout, the local
+# patch branch, the dependency environment, and the gateway's LaunchAgent plist. The sibling `hermes`
+# module stays the Hermes <-> Claude Code bridge only and does not install or pin anything.
+#
+#   setup.sh   clone NousResearch/hermes-agent to ~/.hermes/hermes-agent at the commit in pin.txt, create
+#              branch local/hermes-patches, apply every non-retired patch in the local-patches ledger
+#              (hyp-hermes ledger/local-patches.jsonl), run the official installer's dependency stages
+#   check.sh   read-only: install present, HEAD on local/hermes-patches, commits above the pin are exactly
+#              the ledger's patches, plist matches, `hermes doctor` exits 0 (--dry-run: structure only)
+#   pin.txt    the upstream sha the install is built on (bump together with a rebase; see README.md)
+#   files/Library/LaunchAgents/ai.hermes.gateway.plist
+#              the gateway LaunchAgent, stowed to ~/Library/LaunchAgents by dotm. Loading it into
+#              launchd and restarting the gateway are the operator's steps, never this module's.
+#
+# Machine-local settings (env vars, never committed): HERMES_PLATFORM_HOME, HERMES_PLATFORM_DIR, HERMES_REPO_URL,
+# HERMES_PLATFORM_LEDGER, HERMES_PLATFORM_PATCH_ROOT (see lib.sh). No credentials live here.
+# Relies on: productivity (jq), homebrew uv (the official installer's Python bootstrap).
+
+# Selected only on a Mac that declares `hermes-host` under `capabilities:` in its
+# ~/.config/dotm/config.yml (the same capability as the bridge module).
+requires: [macos, hermes-host]
+
+homebrew_packages:
+  - uv
+
+stow_dirs:
+  - hermes-platform
+
+# Note: after `dotm sync` run once:
+#   ~/src/dotfiles/modules/hermes-platform/setup.sh && ~/src/dotfiles/modules/hermes-platform/check.sh
+# If ~/Library/LaunchAgents/ai.hermes.gateway.plist is still the installer's regular file, stow reports a
+# conflict until that file is moved aside (README.md, "Stowing the plist").
