@@ -56,7 +56,11 @@ the environment or caches it on disk.
 
 ## Routing git to the wrapper
 
-Nothing is changed in `~/.gitconfig`. Agents get, in their environment (`GIT_CONFIG_COUNT=3`; the command-line
+Nothing is changed in `~/.gitconfig`. Verification is routed for every process (not only agents) by the
+module's own `~/.config/git/config` (XDG user-level git config, stowed from `files/.config/git/config`):
+`gpg.ssh.allowedSignersFile = ~/.config/op-agent-sign/allowed_signers`. Without it a launchd job, cron
+entry, probe or guard sees no allowed-signers file and `%G?` reads `N` for every commit even though the
+commits are signed (2026-10-15 incident). Signing stays env-only. Agents get, in their environment (`GIT_CONFIG_COUNT=3`; the command-line
 level beats the global `user.signingkey`, so the human key is never used by an agent):
 
 ```
