@@ -1,0 +1,76 @@
+---
+# inventory/fleet.yml: the Ansible inventory AND the fleet registry, one file, two readers.
+#
+#   ansible-playbook playbooks/bootstrap.yml -l <host>     (ansible.cfg points `inventory` here)
+#   ansible <host> -m ping
+#
+# The IT agent (hermes-agents agents/it) owns this file and the playbooks. A host is in the fleet
+# if and only if it has a row here: Ian's PR that adds the row IS his word for that host. The IT
+# agent bootstraps only hosts listed here and never edits this file except by PR.
+#
+# This repo is public. Rows carry aliases and names, never a key, token, password or an employer
+# name. Host names that must stay machine-local live in ~/.ssh/config as an alias
+# (modules/1password/files/.ssh/config); `ssh.host` below is that alias. Repos with host_rule `eg`
+# (hyp-hermes docs/design/registry/homes.yaml) are not listed here: the overlay for a work host lists them.
+#
+# Per host:
+#   class           eg-laptop | personal-mini | pi
+#   home            eg | personal. The boundary: it selects which agent scopes may be installed
+#                   (home_scopes below). A personal host never gets a `work` scope agent.
+#   capabilities    what the host runs. Those in playbooks/profiles.yml `declared_capabilities` are
+#                   written to the host's ~/.config/dotm/config.yml (dotm selects modules by them);
+#                   those in `informational_capabilities` document modules that apply anyway.
+#   agents          Hermes profiles that belong on the host, by scope (hermes-agents agents/<name>).
+#   repos           working copies the host holds (homes.yaml host_rule must allow the host's home).
+#   backup_target   homes.yaml backup_target value for this host's own state.
+#   peer_gateway    the name under which other hosts' `hermes peer add` registers this host.
+#   ssh             user, host (an ~/.ssh/config alias), key (the NAME of the key the 1Password SSH
+#                   agent serves; never key material).
+#
+# Ian adds hosts by PR. tests: .ci/tests/test_fleet.py (runs in the `fast` CI profile).
+all:
+  vars:
+    fleet_schema: 1
+    fleet_classes: [eg-laptop, personal-mini, pi]
+    fleet_homes: [eg, personal]
+    # Which agent scopes (hermes-agents scope: personal | work | bridge) a home may carry.
+    home_scopes:
+      eg: [bridge, personal, work]
+      personal: [bridge, personal]
+    # Capabilities that name modules which apply on every Mac and need no dotm opt-in.
+    informational_capabilities: [claude, op-agent-sign]
+  hosts:
+    eg-laptop:
+      ansible_connection: local
+      class: eg-laptop
+      home: eg
+      capabilities: [hermes-host, llm-proxy-host, claude, op-agent-sign]
+      agents:
+        bridge: [it, dotfiles, advisor, librarian, researcher, sessions, worker]
+        personal: []
+        work: []
+      repos: [dotfiles, hermes-agents, hyp-hermes]
+      backup_target: icloud-eg
+      peer_gateway: eg-laptop
+      ssh: {user: ianderson, host: localhost, key: none-local-connection}
+    personal-mini:
+      ansible_host: "{{ ssh.host }}"
+      ansible_user: "{{ ssh.user }}"
+      class: personal-mini
+      home: personal
+      capabilities: [hermes-host, claude, op-agent-sign]
+      agents:
+        bridge: [it, sessions, worker]
+        personal: []
+        work: []
+      repos: [dotfiles, hermes-agents]
+      backup_target: icloud-only
+      peer_gateway: personal-mini
+      ssh: {user: ianderson, host: ians-mac-mini, key: 1password-agent}
+  children:
+    eg:
+      hosts:
+        eg-laptop:
+    personal:
+      hosts:
+        personal-mini:
