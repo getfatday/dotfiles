@@ -1,0 +1,7 @@
+# op-agent-sign: signature VERIFICATION for every process, not only agents.
+# git reads this XDG file in addition to ~/.gitconfig, so the git module's ~/.gitconfig stays untouched.
+# Signing is NOT routed here (agents get gpg.ssh.program and user.signingkey from GIT_CONFIG_* env).
+# Without this, a launchd job, cron, a probe or any guard reading %G? sees no allowed-signers file
+# and every commit reads N, even though the commits are signed.
+[gpg "ssh"]
+  allowedSignersFile = ~/.config/op-agent-sign/allowed_signers
