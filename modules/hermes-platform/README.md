@@ -92,6 +92,11 @@ Known limits of the stowed plist, all inherited from the installer's own file:
   correct on the machine it was captured from; a machine with another account needs its own capture
   (`hermes gateway install` writes one) before this file is trustworthy there. (dotfiles-ops: plists need
   absolute paths, normally generated per `$HOME`; this module follows the card and stows the captured file.)
+- Its `PATH` puts `/opt/homebrew/bin` before `/usr/local/bin` and `/usr/bin` (card t_778d3f41, GOAL 5/6 step 4): every gateway-spawned
+  worker then runs the Homebrew `git`, not the Apple `/usr/bin/git` shim whose `git filter discovery failed` stalls (400+ hung processes,
+  29 cards) are the host-stall class. The running job keeps its old `PATH` until the gateway is reloaded (`launchctl bootout` then
+  `bootstrap` of this plist, then the when-idle restart); `launchctl print gui/$UID/ai.hermes.gateway` shows what the loaded job has, and
+  `tools/fleet/host_probe.py --assert-git-homebrew` in hyp-hermes asserts it.
 - Its `PATH` names a dependency-environment directory by hash. A dependency re-resolve changes that hash;
   the gateway starts through `.hermes/bin/hermes`, which does not depend on it, but the plist then
   drifts from reality until it is recaptured. Today the hash in the file
