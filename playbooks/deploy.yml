@@ -150,6 +150,16 @@
         PATH: "/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts.env.PATH }}"
       loop: "{{ mas_installed_apps | default([]) }}"
 
+    # Spotlight skip (module worktree-noindex): an empty .metadata_never_index in every worktree parent
+    # dir and scratch root so mds_stores stops re-indexing them. Idempotent; creates only the marker
+    # file, deletes nothing, never runs mdutil. changed only when a marker was created.
+    - name: Keep Spotlight out of worktree and scratch directories
+      ansible.builtin.command: "{{ playbook_dir }}/../modules/worktree-noindex/noindex.sh"
+      register: worktree_noindex
+      changed_when: "'created=0 ' not in worktree_noindex.stdout"
+      failed_when: false  # best effort: a read-only dir must not stop the sync; check.sh reports it
+      when: "'worktree-noindex' in final_modules"
+
     # Session host (T5 health): the machine that declares `session-host` under `capabilities:`
     # is the fleet's always-addressable remote session host. It never idle-sleeps, wakes for
     # network access, restarts after a power loss, keeps TCP sessions alive across the rare

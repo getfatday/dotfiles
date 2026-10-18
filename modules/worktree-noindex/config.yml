@@ -1,0 +1,31 @@
+---
+# worktree-noindex module
+# Keeps Spotlight (mds_stores) out of the directories that churn constantly: the git worktree parent
+# directories under ~/src and the scratch roots the lander's merge gate and the agents clone into.
+# On 2026-10-18 mds_stores ran at 110-135% CPU for 2 d 15 h re-indexing every scratch clone and every
+# card worktree, and the lander's load gate queued merges and aborted two on HOST_STALL.
+#
+# What it does, on every `dotm sync`: noindex.sh creates an EMPTY `.metadata_never_index` file in
+#   ~/src/*/.worktrees           ~/src/*__worktrees           ~/src/*/.claude/worktrees
+#   $TMPDIR and ~/.hermes/profiles/*/cache/scratch (the scratch dirs workers and the merge gate clone into)
+#   the per-user temp dir (/private/var/folders/*/*/T, where merge-done.* scratch clones live)
+# Only directories that already exist are marked (none is created); an existing marker is left
+# alone; nothing is deleted; `mdutil` is never run (it needs admin). Idempotent.
+#
+#   noindex.sh            apply (prints one `worktree-noindex: dirs=N created=M missing=K` line)
+#   noindex.sh --check    read-only, exit 1 and name every directory that lacks the marker
+#   check.sh              the module check = noindex.sh --check
+#
+# A worktree parent directory created after the last sync is marked at the next one (every 30 min).
+# The merge gate (hyp-hermes tools/merge/merge_done.sh) additionally marks its own scratch dir.
+# Revert: delete the `.metadata_never_index` files and remove this module from base_modules.
+#
+# Env (tests and unusual layouts): NOINDEX_SRC_ROOT (default ~/src), NOINDEX_TMP_ROOTS (colon list
+# replacing the temp roots), NOINDEX_PROFILES_DIR (default ~/.hermes/profiles).
+
+# No `requires:` key: the script is harmless anywhere (a machine without these directories gets no
+# marker; the /private/var/folders glob matches nothing off macOS), so every machine applies it.
+#
+# No packages and no stowed files: the marker files live in directories that are not in this repo.
+# The apply step is noindex.sh, run from the post_tasks block of playbooks/deploy.yml.
+stow_dirs: []
