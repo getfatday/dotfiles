@@ -96,6 +96,7 @@ base_modules:
   - vscode
   - wireguard
   - workmux
+  - worktree-noindex
   - zsh
 
 # Per-profile overrides
