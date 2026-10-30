@@ -18,6 +18,24 @@ RESOLVER="$HERE/gh-account"
 passthrough() { exec "$REAL_GH" "$@"; }
 
 [ -x "$REAL_GH" ] || { echo "gh wrapper: real gh not found at $REAL_GH" >&2; exit 127; }
+
+# git credential helper: "gh auth git-credential get|store|erase", request on stdin.
+# For get, answer with the login that owns the repo in path= (needs credential.useHttpPath).
+# Anything unclear goes to the real gh with the request unchanged.
+if [ "$1" = auth ] && [ "$2" = git-credential ]; then
+  op="$3"
+  req="$(cat)"
+  refeed() { printf '%s\n\n' "$req" | "$REAL_GH" auth git-credential "$op"; exit $?; }
+  [ "$op" = get ] || refeed
+  [ -n "$GH_TOKEN$GH_ENTERPRISE_TOKEN$GH_ACCOUNT_DISABLE" ] && refeed
+  [ -x "$RESOLVER" ] || refeed
+  printf '%s\n' "$req" | grep -q '^path=.' || refeed
+  out="$(printf '%s\n\n' "$req" | "$RESOLVER" credential get 2>/dev/null)" || refeed
+  case "$out" in *username=*password=?*) ;; *) refeed ;; esac
+  [ -n "$GH_ACCOUNT_DEBUG" ] && echo "gh wrapper: git-credential as $(printf '%s\n' "$out" | sed -n 's/^username=//p')" >&2
+  printf '%s\n' "$out"
+  exit 0
+fi
 [ -n "$GH_TOKEN" ] && passthrough "$@"
 [ -n "$GH_ENTERPRISE_TOKEN" ] && passthrough "$@"
 [ -n "$GH_ACCOUNT_DISABLE" ] && passthrough "$@"

@@ -50,10 +50,12 @@
   helper = osxkeychain
 [credential "https://github.com"]
 	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper = !~/.local/bin/gh auth git-credential
+	useHttpPath = true
 [credential "https://gist.github.com"]
 	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper = !~/.local/bin/gh auth git-credential
+	useHttpPath = true
 
 [push]
   default = simple
